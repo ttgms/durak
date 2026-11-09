@@ -1590,11 +1590,13 @@ const music={bufs:null,loading:false,gain:null,idx:0,src:null,timer:0,
   load(){if(this.bufs||this.loading||!audio()||!(window.__MUSIC||[]).length)return;this.loading=true;
     Promise.all(window.__MUSIC.map(u=>bytesOf(u).then(b=>new Promise((ok,no)=>ac.decodeAudioData(b,ok,no)))))
       .then(bs=>{this.bufs=bs;this.loading=false;this.update();}).catch(()=>{this.loading=false;});},
+  // the next track is started by the audio clock, not by a timer: when the tab is hidden the clock stops,
+  // so a timer cannot fire early and lay one tune over the other
   play(){if(!this.bufs||this.src)return;const b=this.bufs[this.idx%this.bufs.length],s=ac.createBufferSource(),t=ac.currentTime,fade=2.5;
     if(!this.gain){this.gain=ac.createGain();this.gain.connect(ac.destination);}
     const g=ac.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(1,t+fade);g.gain.setValueAtTime(1,t+b.duration-fade-1);g.gain.linearRampToValueAtTime(0,t+b.duration-1);
-    s.buffer=b;s.connect(g);g.connect(this.gain);s.start(t);this.src=s;
-    this.timer=setTimeout(()=>{this.src=null;this.idx++;this.play();},(b.duration-fade-1)*1000);},
+    s.buffer=b;s.connect(g);g.connect(this.gain);s.start(t);s.stop(t+b.duration);this.src=s;this.nextAt=t+b.duration-fade-1;
+    if(!this.timer)this.timer=setInterval(()=>{if(this.src&&ac.state==='running'&&ac.currentTime>=this.nextAt){this.src=null;this.idx++;this.play();}},500);},
   update(){const v=this.vol();if(!v){if(this.gain)this.gain.gain.setTargetAtTime(0,ac.currentTime,.3);return;}
     if(!this.bufs){this.load();return;}if(!this.src)this.play();this.gain.gain.setTargetAtTime(v,ac.currentTime,.4);}
 };
