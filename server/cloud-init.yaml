@@ -1,0 +1,49 @@
+#cloud-config
+package_update: true
+packages: [nodejs, curl]
+write_files:
+  - path: /etc/systemd/system/durak.service
+    content: |
+      [Unit]
+      Description=Durak friends table server
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      ExecStartPre=/bin/sh -c 'mkdir -p /opt/durak /var/lib/durak; curl -fsSL https://raw.githubusercontent.com/ttgms/durak/main/server/server.js -o /opt/durak/server.new && mv /opt/durak/server.new /opt/durak/server.js || true'
+      ExecStart=/usr/bin/node /opt/durak/server.js
+      Environment=PORT=8080
+      Environment=DATA=/var/lib/durak/rooms.json
+      Restart=always
+      RestartSec=2
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/systemd/system/caddy.service
+    content: |
+      [Unit]
+      Description=Caddy (HTTPS in front of the durak server)
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      Environment=HOME=/var/lib/caddy
+      Environment=XDG_DATA_HOME=/var/lib/caddy
+      ExecStart=/usr/local/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+      Restart=always
+      RestartSec=3
+      [Install]
+      WantedBy=multi-user.target
+  - path: /usr/local/bin/durak-setup.sh
+    permissions: '0755'
+    content: |
+      #!/bin/sh
+      mkdir -p /opt/durak /var/lib/durak /var/lib/caddy /etc/caddy
+      IP=$(curl -s -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
+      [ -z "$IP" ] && IP=$(curl -s https://api.ipify.org)
+      HOST=$(echo "$IP" | tr . -).sslip.io
+      cd /tmp && curl -fsSL https://github.com/caddyserver/caddy/releases/download/v2.8.4/caddy_2.8.4_linux_amd64.tar.gz -o caddy.tgz && tar xzf caddy.tgz caddy && mv caddy /usr/local/bin/caddy && chmod +x /usr/local/bin/caddy
+      printf '%s {\n  reverse_proxy 127.0.0.1:8080\n}\n' "$HOST" > /etc/caddy/Caddyfile
+      echo "$HOST" > /var/lib/durak/host
+runcmd:
+  - /usr/local/bin/durak-setup.sh
+  - systemctl daemon-reload
+  - systemctl enable --now durak.service
+  - systemctl enable --now caddy.service
