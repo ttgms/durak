@@ -29,6 +29,9 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .screen::before{content:"";position:absolute;inset:0;opacity:.18;pointer-events:none;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 0'/></filter><rect width='180' height='180' filter='url(%23n)'/></svg>")}
 
+/* scrolling menus: the cloth texture, patterns and the live background stay put instead of ending after the first screen */
+.mscreen::before,.mscreen::after{position:fixed!important}
+#home .hdeco{position:fixed}
 /* friends' table */
 .tin{font:500 17px var(--ui);padding:12px 16px;border-radius:14px;border:1.5px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:var(--ink);width:min(300px,100%);text-align:center;outline:none}
 .tin:focus{border-color:var(--gold)}
