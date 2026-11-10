@@ -41,6 +41,15 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .pdnext b{color:var(--paper-ink,#3a2410)}
 .loc.fresh{animation:freshloc 2.6s ease both}@keyframes freshloc{0%,100%{box-shadow:0 0 0 0 rgba(243,213,138,0)}20%,60%{box-shadow:0 0 0 4px rgba(243,213,138,.9),0 0 30px rgba(243,213,138,.6)}}
 .pwarn{margin-top:12px;color:var(--paper-muted)}
+/* shop for money, ad buttons */
+.iap .iapic{height:96px;display:grid;place-items:center;font-size:46px}.iap .iapic svg{height:96px;width:auto;border-radius:8px;box-shadow:0 3px 8px rgba(0,0,0,.25)}
+.iap.big{outline:2px solid #e6b450;outline-offset:-2px;background:linear-gradient(#fff8e6,#f5e3b8)}
+.adbtn{font-size:14px}#overRw .adbtn{display:block;margin:10px auto 0;color:var(--paper-ink);background:var(--paper2);border-color:#ddd1b8}
+#giftM .adbtn{color:var(--paper-ink);background:var(--paper2);border-color:#ddd1b8}
+.dailywrap{position:relative;width:min(360px,100%);display:flex;justify-content:center}.dailywrap .daily{width:100%}
+.dalt{position:absolute;right:8px;top:8px;padding:4px 10px;font-size:16px;border-radius:999px}
+#hintBtn{font-size:14px}
+.card.hint{animation:hintp 1s ease-in-out infinite;z-index:400!important}@keyframes hintp{0%,100%{box-shadow:0 0 0 3px #ffd76e,0 0 6px 2px rgba(255,215,110,.5)}50%{box-shadow:0 0 0 4px #fff1b8,0 0 22px 8px rgba(255,215,110,.95)}}
 /* friends' table */
 .tin{font:500 17px var(--ui);padding:12px 16px;border-radius:14px;border:1.5px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:var(--ink);width:min(300px,100%);text-align:center;outline:none}
 .tin:focus{border-color:var(--gold)}
@@ -355,7 +364,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
     <button id="hSet" class="mtile" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>Настройки</button>
     <button id="hRules" class="mtile" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h9a3 3 0 0 1 3 3v11H8a3 3 0 0 1-3-3z"/><path d="M8 9h6M8 12h6"/></svg>Правила</button>
   </nav>
-  <button id="hDaily" class="panel daily" type="button"><b>Задание дня</b><span id="dailyT"></span><em id="dailyR"></em></button>
+  <div class="dailywrap"><button id="hDaily" class="panel daily" type="button"><b>Задание дня</b><span id="dailyT"></span><em id="dailyR"></em></button><button id="dailyAlt" class="ghost dalt" type="button" hidden title="Сменить задание за рекламу" aria-label="Сменить задание за рекламу">↻</button></div>
   <div id="homeProg"></div>
 </div>
 
@@ -384,7 +393,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 <div id="shop" class="screen mscreen" hidden>
   <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><span class="coins"><span class="coin">₽</span><span class="coinVal">0</span></span></div>
   <header><h2 class="h2">Лавка</h2><p class="sub">Рубашки, колоды и столы</p></header>
-  <div class="tabs" role="tablist"><button id="tbBacks" role="tab" aria-selected="true" type="button">Рубашки</button><button id="tbFaces" role="tab" aria-selected="false" type="button">Колоды</button><button id="tbTables" role="tab" aria-selected="false" type="button">Столы</button></div>
+  <div class="tabs" role="tablist"><button id="tbBacks" role="tab" aria-selected="true" type="button">Рубашки</button><button id="tbFaces" role="tab" aria-selected="false" type="button">Колоды</button><button id="tbTables" role="tab" aria-selected="false" type="button">Столы</button><button id="tbIap" role="tab" aria-selected="false" type="button" hidden>Казна</button></div>
   <div id="shopGrid"></div>
 </div>
 
@@ -424,7 +433,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 <div id="table" class="screen" role="application" aria-label="Карточный стол" hidden>
   <div id="seats"></div>
   <div id="goals"></div>
-  <div id="hud"><button id="chatBtn" class="ghost" type="button" hidden aria-label="Фразы">💬</button><button id="toMenu" class="ghost" type="button">☰ Меню</button></div>
+  <div id="hud"><button id="hintBtn" class="ghost" type="button" hidden title="Подсказка за рекламу">💡 Совет</button><button id="chatBtn" class="ghost" type="button" hidden aria-label="Фразы">💬</button><button id="toMenu" class="ghost" type="button">☰ Меню</button></div>
   <div id="chatP" class="phrases" hidden></div>
   <div id="deckInfo"></div>
   <div id="discInfo"></div>
@@ -479,7 +488,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   <h2>Подарок дня</h2>
   <p id="giftP"></p>
   <div class="row" style="margin-bottom:14px" id="giftRow"></div>
-  <button id="giftTake" class="gold" type="button">Забрать</button>
+  <div class="row"><button id="giftTake" class="gold" type="button">Забрать</button><button id="giftAd" class="plain adbtn" type="button" hidden>📺 Удвоить за рекламу</button></div>
 </div></div>
 
 <div id="settings" class="modal" hidden><div class="p">
@@ -1075,6 +1084,12 @@ const BACK_ART={
     `<g fill="#b8222a">${[...Array(12)].map((_,i)=>`<circle cx="${14+i*6.6}" cy="15" r="1.6"/><circle cx="${14+i*6.6}" cy="125" r="1.6"/>`).join('')}</g>`+
     `<g fill="#2f7a46">${[...Array(11)].map((_,i)=>`<circle cx="${17.3+i*6.6}" cy="15" r=".9"/><circle cx="${17.3+i*6.6}" cy="125" r=".9"/>`).join('')}</g>`+
     matr(22,82,.86,'#2f5fb3','#d23026')+matr(78,82,.86,'#2f7a46','#d23026')+matr(50,74,1.45,'#c8202e','#2f5fb3')),
+  boyar:()=>base('#3b1030',
+    `<rect x="6" y="6" width="88" height="128" rx="5" fill="none" stroke="#e6b450" stroke-width="2.2"/><rect x="11" y="11" width="78" height="118" rx="3" fill="none" stroke="#e6b450" stroke-width=".8" stroke-dasharray="1.5 2.5"/>`+
+    `<g fill="#e6b450" opacity=".22">${[...Array(6)].map((_,r)=>[...Array(4)].map((_,c)=>`<path d="M${22+c*19} ${24+r*19}l3 4-3 4-3-4z"/>`).join('')).join('')}</g>`+
+    `<circle cx="50" cy="70" r="24" fill="#3b1030" stroke="#e6b450" stroke-width="2"/><circle cx="50" cy="70" r="19" fill="none" stroke="#e6b450" stroke-width=".7" stroke-dasharray="2 2"/>`+
+    `<path d="M35 77l-3-15 9 7 9-12 9 12 9-7-3 15z" fill="#e6b450"/><rect x="34" y="78" width="32" height="4" rx="1" fill="#e6b450"/><circle cx="50" cy="56" r="2.2" fill="#e6b450"/><circle cx="41" cy="73" r="1.6" fill="#c8202e"/><circle cx="50" cy="72" r="1.8" fill="#2f7a46"/><circle cx="59" cy="73" r="1.6" fill="#c8202e"/>`+
+    corners(()=>`<path d="M0-5l1.6 3.4 3.4 1.6-3.4 1.6L0 5l-1.6-3.4L-5 0l3.4-1.6z" fill="#e6b450"/>`)),
   kruzhevo:()=>base('#1b2a55',
     `<g fill="none" stroke="#f3f0e8" stroke-width=".8">`+
       `<path d="${[...Array(15)].map((_,i)=>`M${7+i*6} 9a3 3 0 0 0 6 0`).join('')}"/><path d="${[...Array(15)].map((_,i)=>`M${7+i*6} 131a3 3 0 0 1 6 0`).join('')}"/>`+
@@ -1438,7 +1453,7 @@ LOCS.forEach((L,li)=>L.stages.forEach((st,si)=>{if(!st.goals)st.goals=autoGoals(
 const STARS_MAX=LOCS.reduce((a,l)=>a+l.stages.length*3,0);
 const SHOP={
   backs:[{id:'gzhel',name:'Гжель',price:0},{id:'hohloma',name:'Хохлома',price:900},{id:'matr',name:'Матрёшки',price:1200},{id:'gorodets',name:'Городец',price:1500},
-         {id:'mezen',name:'Мезень',price:1800},{id:'zhostovo',name:'Жостово',price:2400},{id:'kruzhevo',name:'Вологодское кружево',price:2600},{id:'pavlov',name:'Павловский платок',price:3000},{id:'palekh',name:'Палех',price:3500},{id:'tsar',name:'Царская',price:-1,how:'Награда за Царский пир'}],
+         {id:'mezen',name:'Мезень',price:1800},{id:'zhostovo',name:'Жостово',price:2400},{id:'kruzhevo',name:'Вологодское кружево',price:2600},{id:'pavlov',name:'Павловский платок',price:3000},{id:'boyar',name:'Боярская',price:-1,how:'Только в «Боярском пакете» (Казна)'},{id:'palekh',name:'Палех',price:3500},{id:'tsar',name:'Царская',price:-1,how:'Награда за Царский пир'}],
   faces:[{id:'classic',name:'Классическая',price:0},{id:'big',name:'Крупные знаки',price:300,d:'Большие значки — удобно на телефоне'},{id:'four',name:'Четыре цвета',price:700,d:'Каждая масть своим цветом'},{id:'night',name:'Ночная',price:1000,d:'Тёмные карты — не слепят вечером'},
          {id:'lubok',name:'Лубок',price:1500,d:'Яркая народная картинка'},
          {id:'russ',name:'Русская',price:2200,d:'Цари, царицы и богатыри'},{id:'skaz',name:'Сказочная',price:-1,d:'Царь, Яга, Кощей и другие герои игры',how:'Награда за первую победу в игре с друзьями (скоро)'},{id:'gold',name:'Золотая',price:-1,how:'Награда за все 120 звёзд'}],
@@ -1484,7 +1499,7 @@ function freshSave(){return {v:2,coins:0,set:Object.assign({},DEF_SET),owned:['g
       byMode:{podkidnoy:{g:0,w:0},perevodnoy:{g:0,w:0}},byDeck:{36:{g:0,w:0},54:{g:0,w:0}},byPlayers:{}}};}
 let save=freshSave();
 try{const s=JSON.parse(localStorage.getItem('durak_v2')||'null');if(s&&s.v===2){const f=freshSave();save=Object.assign(f,s);save.set=Object.assign({},DEF_SET,s.set||{});save.st=Object.assign(f.st,s.st||{});save.quick=Object.assign(f.quick,s.quick||{});if(!save.owned.includes('classic'))save.owned.push('classic');if(!save.face)save.face='classic';}}catch(e){}
-const persist=()=>{try{localStorage.setItem('durak_v2',JSON.stringify(save));}catch(e){}};
+const persist=()=>{try{localStorage.setItem('durak_v2',JSON.stringify(save));}catch(e){}if(window.__cloud)try{window.__cloud(save);}catch(e){}};
 const stageKey=(l,i)=>l+'.'+i;
 const stageRec=(l,i)=>save.camp[stageKey(l,i)]||{won:false,stars:[0,0,0]};
 function starsTotal(){let n=0;for(const k in save.camp)n+=save.camp[k].stars.reduce((a,b)=>a+b,0);return n;}
@@ -1498,7 +1513,9 @@ function dayKey(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)
 
 /* ---------- daily challenge: same task for everyone on a given day ---------- */
 const DAILY_REWARD=80;
-function dailyTask(){const d=dayKey();let h=7;for(const ch of d)h=(h*31+ch.charCodeAt(0))>>>0;const r=makeRng(h);
+function dailyTask(){const d=dayKey();let h=7;for(const ch of d)h=(h*31+ch.charCodeAt(0))>>>0;
+  // a task swapped for another (after an ad) stays swapped for the rest of the day
+  if(save.dailyAlt&&save.dailyAlt.day===d)h=(h^(save.dailyAlt.n*2654435761))>>>0;const r=makeRng(h);
   const mode=r()<.5?'podkidnoy':'perevodnoy',deck=r()<.3?54:36,players=2+Math.floor(r()*3),big=deck===54;
   // goal numbers fitted by simulation so a good player manages them in roughly a third of the wins or more
   const pool=['take'+(players===2?(big?5:1):players===3?(big?1:0):(big?1:0))];
@@ -1694,6 +1711,7 @@ function checkGift(){const today=dayKey();if(save.gift.day===today)return;
   const streak=save.gift.day===yk?Math.min(save.gift.streak+1,GIFTS.length):1,amount=GIFTS[streak-1];
   $('giftP').textContent=streak>1?`Вы заходите ${plural(streak,'день','дня','дней')} подряд — подарок растёт.`:'Заходите каждый день — подарок будет расти.';
   $('giftRow').innerHTML=GIFTS.map((g,i)=>`<span style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:${i<streak?'#8a5d16':'#b7ab92'}"><span class="coin" style="width:26px;height:26px;opacity:${i<streak?1:.45}">₽</span>${g}</span>`).join('');
+  $('giftTake').dataset.amount=amount;
   $('giftTake').onclick=()=>{save.gift={day:today,streak};addCoins(amount);coinSnd();modal('giftM',false);toast('Подарок дня','+'+amount+' монет');};
   modal('giftM',true);}
 
@@ -1836,7 +1854,7 @@ addEventListener('keydown',e=>{if(e.key!=='Escape')return;
 
 /* ---------- game ---------- */
 const table=$('table');
-let NET=false,g=null,cfg=null,seatChar=[],els={},anim=false,botT=0,botThinking=false,target=-1,pending=null;
+let lastWin=0,NET=false,g=null,cfg=null,seatChar=[],els={},anim=false,botT=0,botThinking=false,target=-1,pending=null;
 let masked=[],ghost=null,track=null,fastFwd=false,gen=0,myRun=false,extraPending=false,RU={},cheatSeen=-1,trumpSeen=true,chestCard=null,tmrT=0,tmrLeft=0;
 function clearAll(){gen++;stopTimer();clearTimeout(botT);botThinking=false;anim=false;fastFwd=false;myRun=false;extraPending=false;Object.values(els).forEach(e=>e.remove());els={};g=null;$('seats').innerHTML='';}
 function leaveGame(){forfeit();const back=cfg&&cfg.kind==='camp'?'camp':cfg&&cfg.kind==='online'?'friends':'quick';clearAll();modal('over',false);show(back);}
@@ -2177,7 +2195,9 @@ function showOver(){
       s.dailyCount=(s.dailyCount||0)+1;if(s.dailyCount>=7&&!save.owned.includes('morozko')){save.owned.push('morozko');rw.push('Стол «Морозко»');}}
     else if(!dailyDone())rw.push('Задание дня не выполнено — попробуйте ещё');}
   else if(draw)coins+=5;
+  if(coins&&win&&save.iap&&save.iap.boyar){coins*=2;rw.push('Боярский пакет: монеты ×2');}
   if(coins){addCoins(coins);rw.unshift('+'+coins+' монет');}
+  lastWin=win?coins:0;
   persist();
   // texts
   let t,m;const foolName=fool>0?CHR(seatChar[fool]).name:'';
@@ -2207,6 +2227,7 @@ function showOver(){
   const pl=$('places');if(n>2){const order=g.out.slice();if(fool>=0)order.push(fool);
     pl.innerHTML=order.map((p,i)=>`<div class="${p===0?'me':''}"><span>${i+1}. ${p===0?'Вы':CHR(seatChar[p]).name}</span><span>${p===fool?'дурак':i===0?'первым':''}</span></div>`).join('');pl.hidden=false;}else pl.hidden=true;
   $('overRw').innerHTML=rw.map(x=>`<span>${x.startsWith('+')&&x.includes('монет')?'<span class="coin">₽</span>':''}${x}</span>`).join('');
+  if(typeof moneyOver==='function')moneyOver(win);
   // buttons
   const main=$('overMain'),alt=$('overAlt');
   if(cfg.kind==='camp'){const L=LOCS[cfg.li];let next=null;
@@ -2450,6 +2471,105 @@ function renderLobby(){
 $('lStart').onclick=()=>{audio();netCall('start');};
 // a link with ?t=CODE opens the friends' screen ready to join
 (function(){try{const t=new URLSearchParams(location.search).get('t');if(t){$('fCode').value=t;show('friends');renderFriends();$('fMsg').textContent='Введите имя и нажмите «Войти».';}}catch(e){}})();
+
+/* ---------- shop for real money and ads for rewards (only where the platform offers them: Pikabu) ---------- */
+// window.__PF is set by the platform page before the game starts; the plain site has none, and all of this stays hidden.
+const PF=window.__PF||null;
+if(!save.iap)save.iap={};if(!save.iapDone)save.iapDone={};
+const IAP=[
+  {id:'boyar',name:'Боярский пакет',d:'Навсегда без рекламы, монеты за победы ×2 и рубашка «Боярская», которой больше нигде нет',big:true},
+  {id:'noads',name:'Без рекламы',d:'Навсегда убирает рекламу между партиями. Реклама за награду остаётся по желанию'},
+  {id:'starter',name:'Стартовый набор',d:'2 000 монет, рубашка «Городец» и колода «Русская»'},
+  {id:'coins3000',name:'Мешок монет',d:'3 000 монет'},
+  {id:'coins10000',name:'Царская казна',d:'10 000 монет — больше всего монет за рубль'}];
+const COINS_OF={coins3000:3000,coins10000:10000};
+function own(id){if(!save.owned.includes(id))save.owned.push(id);}
+// what a product gives; permanent ones are given once and remembered
+function grant(id,purchaseId){
+  if(COINS_OF[id]){if(purchaseId&&save.iapDone[purchaseId])return false;if(purchaseId)save.iapDone[purchaseId]=1;addCoins(COINS_OF[id]);return true;}
+  if(save.iap[id])return false;save.iap[id]=true;
+  if(id==='starter'){addCoins(2000);own('gorodets');own('russ');}
+  if(id==='boyar'){own('boyar');save.iap.noads=true;}
+  if(id==='noads')save.iap.noads=true;
+  persist();return true;}
+const noAds=()=>!!(save.iap.noads||save.iap.boyar);
+// ads pause the game's sound
+function withAd(show){if(!PF)return Promise.resolve(null);const wasPaused=paused;paused=true;try{if(ac)ac.suspend();}catch(e){}
+  const back=r=>{paused=wasPaused;try{if(ac&&!document.hidden)ac.resume();}catch(e){}return r;};
+  return show().then(back,()=>back(null));}
+function rewarded(){return withAd(()=>PF.rewarded()).then(r=>!!r);}
+let rewardedOk=false;
+function checkRewarded(){if(!PF)return;Promise.resolve(PF.canRewarded()).then(v=>{rewardedOk=!!v;refreshAdButtons();},()=>{});}
+
+/* --- purchases made earlier (and coin packs paid for but not yet given) --- */
+function applyOwned(){if(!PF||!PF.store)return;let changed=false;
+  for(const id of PF.store.owned())if(!COINS_OF[id])changed=grant(id)||changed;
+  for(const p of PF.store.pending()){if(grant(p.productId,p.purchaseId))changed=true;PF.store.consume(p.purchaseId);}
+  if(changed){refreshCoins();if(!$('shop').hidden)renderShop();}}
+if(PF){applyOwned();addEventListener('pf-store',()=>{applyOwned();if(!$('shop').hidden)renderShop();});}
+
+/* --- the «Казна» tab in the shop --- */
+const AD_COINS=60,AD_COINS_DAY=5;
+function adCoinsLeft(){const d=dayKey();if(!save.adCoins||save.adCoins.d!==d)save.adCoins={d,n:0};return AD_COINS_DAY-save.adCoins.n;}
+if(PF){$('tbIap').hidden=false;$('tbIap').onclick=()=>{shopTab='iap';renderShop();};}
+const renderShop0=renderShop;
+renderShop=function(){
+  $('tbIap').setAttribute('aria-selected',String(shopTab==='iap'));
+  if(shopTab!=='iap'){renderShop0();return;}
+  ['tbBacks','tbFaces','tbTables'].forEach(id=>$(id).setAttribute('aria-selected','false'));
+  const st=PF&&PF.store,prod=st?st.products():[];
+  const price=id=>{const p=prod.find(x=>x.id===id);return p?p.price:null;};
+  let h='';
+  if(rewardedOk||adCoinsLeft()>0){const left=adCoinsLeft();
+    h+=`<div class="panel item iap ad"><div class="iapic">🎁</div><h4>Монеты за рекламу</h4><div class="d">+${AD_COINS} монет за короткий ролик</div><div class="how">Осталось сегодня: ${left} из ${AD_COINS_DAY}</div>
+      <button class="gold" id="adCoins" type="button" ${left<=0||!rewardedOk?'disabled':''}>Смотреть</button></div>`;}
+  for(const it of IAP){const pr=price(it.id),have=!COINS_OF[it.id]&&save.iap[it.id];
+    const bought=have||(it.id==='noads'&&save.iap.boyar);
+    h+=`<div class="panel item iap${it.big?' big':''}"><div class="iapic">${it.id==='boyar'?backSVG('boyar'):it.id==='noads'?'🚫':it.id==='starter'?'🎒':'💰'}</div><h4>${it.name}</h4><div class="d">${it.d}</div>
+      ${bought?'<div class="sel">✓ Куплено</div>':pr==null?'<button class="gold" disabled type="button">Недоступно</button>':`<button class="gold" data-iap="${it.id}" type="button">${pr} ₽</button>`}</div>`;}
+  $('shopGrid').innerHTML=h;
+  const ac0=$('adCoins');if(ac0)ac0.onclick=()=>{if(adCoinsLeft()<=0)return;ac0.disabled=true;rewarded().then(ok=>{if(ok){save.adCoins.n++;addCoins(AD_COINS);coinSnd();}checkRewarded();renderShop();});};
+  $('shopGrid').querySelectorAll('[data-iap]').forEach(b=>b.onclick=()=>{const id=b.dataset.iap;b.disabled=true;b.textContent='Оплата…';
+    withAd(()=>st.buy(id)).then(r=>{
+      if(r&&r.ok){grant(id,r.purchaseId);if(COINS_OF[id]&&r.purchaseId)st.consume(r.purchaseId);coinSnd();checkAch();
+        if(id==='boyar'||id==='starter')toast('Спасибо за покупку!',IAP.find(x=>x.id===id).name);}
+      else if(r&&r.reason==='NON_CONSUMABLE_ALREADY_OWNED')grant(id);
+      renderShop();refreshCoins();});});
+  refreshCoins();};
+
+/* --- rewards for watching: double the win, double the daily gift, swap the daily task, a hint --- */
+function moneyOver(win){
+  const box=$('overRw');if(!PF||!win||lastWin<=0||!rewardedOk)return;
+  box.insertAdjacentHTML('beforeend',`<button id="adDouble" class="plain adbtn" type="button">📺 Удвоить: +${lastWin} за рекламу</button>`);
+  $('adDouble').onclick=()=>{const b=$('adDouble');b.disabled=true;rewarded().then(ok=>{if(ok){addCoins(lastWin);coinSnd();b.textContent='✓ Монеты удвоены';}else b.disabled=false;checkRewarded();});};}
+if(PF){
+  $('giftAd').onclick=()=>{const b=$('giftAd');b.disabled=true;rewarded().then(ok=>{
+    if(ok){const amount=+$('giftTake').dataset.amount||0;$('giftTake').click();addCoins(amount);toast('Подарок удвоен','+'+amount+' монет');}else b.disabled=false;checkRewarded();});};
+  $('dailyAlt').onclick=e=>{e.stopPropagation();if(dailyDone())return;const b=$('dailyAlt');b.disabled=true;rewarded().then(ok=>{
+    if(ok){const d=dayKey();save.dailyAlt={day:d,n:(save.dailyAlt&&save.dailyAlt.day===d?save.dailyAlt.n:0)+1};persist();renderDaily();}
+    b.disabled=false;checkRewarded();});};
+  $('hintBtn').onclick=()=>{if(!g||g.over||NET||anim||g.toMove()!==0||hintUsed)return;const b=$('hintBtn');b.disabled=true;rewarded().then(ok=>{
+    b.disabled=false;if(!ok){checkRewarded();return;}hintUsed=true;refreshAdButtons();showHint();checkRewarded();});};}
+let hintUsed=false;
+// the move a strong player would make here, shown with a soft pulse
+function showHint(){if(!g||g.over||g.toMove()!==0)return;let m=null;try{m=aiMove(g,0,STYLES.shrewd);}catch(e){}
+  if(!m)return;document.querySelectorAll('.hint').forEach(e=>e.classList.remove('hint'));
+  if(m.c&&els[m.c.id]){els[m.c.id].classList.add('hint');gToast(m.t==='transfer'?'Совет: переведите этой картой':m.t==='defend'?'Совет: отбейтесь этой картой':'Совет: ходите этой картой');}
+  else gToast(m.t==='take'?'Совет: лучше взять':g.att===0?'Совет: пора сказать «Бито»':'Совет: лучше не подкидывать');
+  setTimeout(()=>document.querySelectorAll('.hint').forEach(e=>e.classList.remove('hint')),6000);}
+function refreshAdButtons(){if(!PF)return;
+  $('giftAd').hidden=!rewardedOk;$('dailyAlt').hidden=!rewardedOk||dailyDone();
+  $('hintBtn').hidden=!rewardedOk||!g||NET||hintUsed||!!(g&&g.over);}
+const renderDaily0=renderDaily;renderDaily=function(){renderDaily0();refreshAdButtons();};
+
+/* --- an ordinary ad between games: not before the second game, at most every 3.5 minutes, never mid-game --- */
+let lastFull=Date.now(),gamesHere=0;
+const startGame0=startGame;
+startGame=function(c){hintUsed=false;gamesHere++;
+  const can=PF&&!noAds()&&gamesHere>1&&c.kind!=='online'&&Date.now()-lastFull>210000;
+  if(!can){startGame0(c);refreshAdButtons();return;}
+  lastFull=Date.now();withAd(()=>PF.fullscreen()).then(()=>{startGame0(c);refreshAdButtons();});};
+if(PF){checkRewarded();setInterval(checkRewarded,60000);if(PF.started)PF.started();}
 
 })();
 </script>
