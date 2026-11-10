@@ -32,6 +32,14 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 /* scrolling menus: the cloth texture, patterns and the live background stay put instead of ending after the first screen */
 .mscreen::before,.mscreen::after{position:fixed!important}
 #home .hdeco{position:fixed}
+.obadge{display:inline-block;margin:0 auto 6px;padding:5px 14px;border-radius:999px;background:linear-gradient(#f3d58a,#d4a73c);color:#3a2410;font:700 12px var(--ui);letter-spacing:.08em;text-transform:uppercase;animation:pop .5s ease both}
+.obadge.big{font-size:14px;padding:7px 18px;box-shadow:0 0 0 3px rgba(243,213,138,.3)}
+.pdone{text-align:center}.pdcrown{font-size:54px;line-height:1;animation:pop .6s ease both}
+.pdone h2{font-family:var(--display);font-weight:400;font-size:30px;margin:8px 0 4px}
+.pdstars{margin:0 0 12px;font-size:16px}.pdstars .on{color:#d4a73c}
+.pdnext{display:flex;flex-direction:column;gap:4px;margin:0 0 16px;font-size:14px;color:var(--paper-muted)}.pdnext b{font-family:var(--display);font-weight:400;font-size:24px;color:inherit}
+.pdnext b{color:var(--paper-ink,#3a2410)}
+.loc.fresh{animation:freshloc 2.6s ease both}@keyframes freshloc{0%,100%{box-shadow:0 0 0 0 rgba(243,213,138,0)}20%,60%{box-shadow:0 0 0 4px rgba(243,213,138,.9),0 0 30px rgba(243,213,138,.6)}}
 /* friends' table */
 .tin{font:500 17px var(--ui);padding:12px 16px;border-radius:14px;border:1.5px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:var(--ink);width:min(300px,100%);text-align:center;outline:none}
 .tin:focus{border-color:var(--gold)}
@@ -424,11 +432,19 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   <button id="skipOut" class="plain" type="button" hidden>Досмотреть быстро</button>
 </div>
 
+<div id="placeDone" class="modal" hidden><div class="p pdone">
+  <div class="pdcrown" aria-hidden="true">👑</div>
+  <h2 id="pdT"></h2>
+  <p id="pdStars" class="pdstars"></p>
+  <p id="pdNext" class="pdnext"></p>
+  <div class="row"><button id="pdGo" class="gold" type="button">Отправиться</button></div>
+</div></div>
 <div id="over" class="modal" hidden><div class="p">
   <div id="pogFig" hidden>
     <svg class="body" viewBox="0 0 180 116" aria-hidden="true"><path d="M8 116c0-34 22-56 50-60h64c28 4 50 26 50 60z" fill="#2e5a8c"/><path d="M70 56h40l-6 20h-28z" fill="#24476f"/></svg><div class="head" id="pogHead"></div>
     <div class="ep l"></div><div class="ep r"></div>
   </div>
+  <div id="overBadge" class="obadge" hidden></div>
   <h2 id="overT"></h2>
   <div id="overStars" hidden></div>
   <p id="overP"></p>
@@ -486,7 +502,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 
 <div id="achToast" aria-live="polite"><span class="medal">★</span><span><b id="toastT"></b><small id="toastS"></small></span></div>
 
-<script>window.__NET_API="https://158-160-164-98.sslip.io/api";window.__NET_WS="wss://158-160-164-98.sslip.io/ws";window.__NET_SHARE="https://ttgms.github.io/durak/";window.__MUSIC=["music/t1.mp3", "music/t2.mp3"];</script>
+<script>window.__NET_API=window.__NET_API||"https://158-160-164-98.sslip.io/api";window.__NET_WS=window.__NET_WS||"wss://158-160-164-98.sslip.io/ws";window.__NET_SHARE=window.__NET_SHARE||"https://ttgms.github.io/durak/";window.__MUSIC=["music/t1.mp3", "music/t2.mp3"];</script>
 <script>
 (()=>{
 "use strict";
@@ -1539,9 +1555,24 @@ MP.apply=function(e){const g=this.g,R=this.R,p=R(e.p);if(this.bad)return false;
     case'cd':ok=g.cheatDefend(p,c,e.i);break;case'ca':ok=g.cheatAttack(p,c);break;case'acc':ok=g.accuse(p);break;}
   g._ap=[];
   if(!ok){this.bad=true;return false;}
+  this.finish(e);this.logLen++;return !this.bad;};
+// my own move, played on the copy at once (before the server confirms it), so the card goes down without waiting.
+// Who else passes is unknown here, so the copy never closes a round by itself on a guess; the confirmation fills that in.
+MP.local=function(m){const g=this.g,e0=g.events.length;g._ap=[];let ok=false;const c=m.c;
+  switch(m.t){case'attack':ok=g.attack(0,c);break;case'defend':ok=g.defend(0,c,m.i);break;case'transfer':ok=g.transfer(0,c);break;
+    case'show':ok=g.show(0,c);break;case'take':ok=g.take(0);break;case'done':ok=g.done(0);break;
+    case'cd':ok=g.cheatDefend(0,c,m.i);break;case'ca':ok=g.cheatAttack(0,c);break;}
+  if(!ok)return null;
+  return {t:m.t,c:c?c.id:undefined,draws:g.events.slice(e0).filter(x=>x.t==='draw').map(x=>x.c)};};
+// the server's copy of a move already played here: add what only the server knew (automatic passes, cards drawn)
+MP.echo=function(e,pend){const g=this.g,R=this.R;
+  if(pend.draws.length){if(Array.isArray(e.dr))e.dr.forEach((id,j)=>{if(id&&pend.draws[j])this.reveal(pend.draws[j],id);});}
+  else{if(Array.isArray(e.dr))e.dr.forEach((id,j)=>{if(id)this.reveal(g.deck[g.deck.length-1-j],id);});
+    g._ap=(e.ap||[]).map(R);if(g._ap.length)g.settle();g._ap=[];}
+  this.finish(e);this.logLen++;return !this.bad;};
+MP.finish=function(e){const g=this.g,R=this.R;
   if(e.hs)e.hs.forEach((ids,sp)=>{const q=R(sp);const h=g.hands[q];ids.forEach(id=>{if(!h.some(x=>x.id===id)){const ph=h.find(x=>x.ph);if(ph)this.reveal(ph,id);}});});
-  if(e.fo){g.fool=e.fo[0]>=0?R(e.fo[0]):-1;g.pogony=e.fo[1];g.loserTeam=e.fo[2];}
-  this.logLen++;return !this.bad;};
+  if(e.fo){g.fool=e.fo[0]>=0?R(e.fo[0]):-1;g.pogony=e.fo[1];g.loserTeam=e.fo[2];}};
 // what the server will accept from me (seat 0 here) as a log move
 MP.wire=function(m){const o={t:m.t};if(m.c)o.c=m.c.id;if(m.i!=null)o.i=m.i;return o;};
 // settle() without peeking into hidden hands: the server says who was passed over
@@ -1565,7 +1596,7 @@ const plural=(n,a,b,c)=>{const m=n%10,h=n%100;return n+' '+(m===1&&h!==11?a:m>=2
 
 /* ---------- sound ---------- */
 let ac=null;
-function audio(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();}catch(e){}return ac;}
+function audio(){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();if(ac.state!=='running'&&ac.state!=='closed')ac.resume();}catch(e){}return ac;}
 function noise(dur,shape,filt,freq,vol){if(!save.set.snd||!audio())return;try{const n=Math.floor(ac.sampleRate*dur),b=ac.createBuffer(1,n,ac.sampleRate),d=b.getChannelData(0);
   for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/n,shape);const s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();
   f.type=filt;f.frequency.value=freq;g.gain.value=vol;s.buffer=b;s.connect(f);f.connect(g);g.connect(ac.destination);s.start();}catch(e){}}
@@ -1582,7 +1613,10 @@ const coinSnd=()=>tones([[1318,0,.12],[1760,.07,.25]],'square',.05);
 /* ---------- background music: two calm folk tracks, cross-faded one into the other ---------- */
 const MUS_VOL=[0,.22,.45];
 // soft wooden click for every button press
-const clickSnd=()=>{if(!audio()||!save.set.snd)return;noise(.035,.5,'bandpass',2600,.08);tones([[520,0,.05]],'triangle',.035);};
+const clickSnd=()=>{if(!audio()||!save.set.snd)return;try{const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();
+  o.type='sine';o.frequency.setValueAtTime(1400,t);o.frequency.exponentialRampToValueAtTime(700,t+.06);
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.07,t+.006);g.gain.exponentialRampToValueAtTime(.001,t+.08);
+  o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+.1);}catch(e){}};
 document.addEventListener('pointerdown',e=>{const b=e.target.closest&&e.target.closest('button');if(b&&!b.disabled)clickSnd();},true);
 const CHEST_COINS=30,SUIT_NAME_RU={s:'пики ♠',c:'трефы ♣',h:'червы ♥',d:'бубны ♦'};
 // embedded tracks are decoded by hand: some pages forbid fetch() even for data: addresses
@@ -1605,7 +1639,10 @@ const music={bufs:null,loading:false,gain:null,idx:0,src:null,timer:0,
 };
 // the first tap anywhere starts the music (browsers only allow sound after a user action)
 addEventListener('pointerdown',()=>{if(save.set.mus)music.update();},{passive:true});
-document.addEventListener('visibilitychange',()=>{if(!ac)return;if(document.hidden)ac.suspend();else ac.resume();});
+document.addEventListener('visibilitychange',()=>{if(!ac)return;if(document.hidden)ac.suspend();else{ac.resume().catch(()=>{});if(save.set.mus)music.update();}});
+// iPhone browsers freeze sound when the app goes to the background; the next touch brings it back
+['touchend','pointerup','keydown'].forEach(ev=>addEventListener(ev,()=>{if(ac&&ac.state!=='running'){audio();if(save.set.mus)music.update();}},{passive:true,capture:true}));
+addEventListener('pageshow',()=>{if(ac&&ac.state!=='running')ac.resume().catch(()=>{});});
 
 /* ---------- navigation ---------- */
 const SCREENS=['home','camp','quick','shop','stats','table','friends','lobby'];
@@ -1839,7 +1876,7 @@ let W,H,CW,CH,PORT,SHORT,handY=0;
 function measure(){W=table.clientWidth;H=table.clientHeight;PORT=W<H*.8;SHORT=!PORT&&H<520;
   CW=Math.round(PORT?Math.max(54,Math.min(W/5.3,H/7.4,100)):Math.max(54,Math.min(W/7.2,H/6.4,112)));CH=Math.round(CW*1.4);
   table.style.setProperty('--cw',CW+'px');table.style.setProperty('--ch',CH+'px');}
-function place(c,x,y,r,z,up,s){const e=els[c.id];s=s||1;
+function place(c,x,y,r,z,up,s){const e=els[c.id];s=s||1;if(c.ph)up=false; // a card not known yet stays face down
   e.style.transform=`translate(${x-CW*(1-s)/2}px,${y-CH*(1-s)/2}px) rotate(${r||0}deg) scale(${s})`;e.style.zIndex=z;e.classList.toggle('down',!up);e.classList.toggle('mini',s<1);}
 const suitIcon=s=>`<svg viewBox="0 0 10 10">${suitShape(s,5,5,10,false,RED[s]?'#e0474d':'#f6efe0')}</svg>`;
 function clean(c,...keep){const e=els[c.id];for(const k of ['stack','play','dim','target','pick'])if(!keep.includes(k))e.classList.remove(k);}
@@ -1922,8 +1959,9 @@ function canUse(c,cheat){if(!g||g.over||anim||paused||!g.active(0)||(NET&&netWai
   if(g.def!==0)return g.canAttack(0,c);
   return g.canTransfer(0,c)||g.table.some((x,i)=>g.canDefend(0,c,i));}
 function markPlayable(){if(!g)return;const hl=save.set.hl&&!RU.nohint&&(trumpSeen||g.def!==0),active=!g.over&&!anim&&!paused&&g.active(0)&&((!botThinking&&g.toMove()===0)||(myRun&&g.def!==0));
+  const okAll=active&&g.hands[0].every(c=>masked.includes(c)||canUse(c));
   g.hands[0].forEach(c=>{const e=els[c.id];if(masked.includes(c)){e.classList.remove('play','dim');return;}const ok=active&&canUse(c);
-    e.classList.toggle('play',hl&&ok);e.classList.toggle('dim',hl&&active&&!ok&&g.table.length>0);e.style.cursor=ok?'pointer':'';});}
+    e.classList.toggle('play',hl&&ok&&!okAll);e.classList.toggle('dim',hl&&active&&!ok&&g.table.length>0);e.style.cursor=ok?'pointer':'';});}
 function shake(c){const e=els[c.id];e.classList.remove('shake');void e.offsetWidth;e.classList.add('shake');}
 function onCard(c){
   if(!g||anim||paused||g.over)return;audio();
@@ -2155,6 +2193,9 @@ function showOver(){
       requestAnimationFrame(()=>eps.forEach((e,i)=>{if(sixes[i]){e.classList.add('show');setTimeout(slap,i?650:300);}}));
       t=fool===0?'Погоны!':'Погоны: '+foolName+'!';}}
   $('overT').textContent=t;$('overP').textContent=m;
+  const ob=$('overBadge');ob.hidden=true;
+  if(cfg.kind==='camp'&&win){const L=LOCS[cfg.li],last=cfg.si===L.stages.length-1;ob.hidden=false;
+    ob.textContent=last?`Место «${L.name}» пройдено!`:`Этап ${cfg.si+1} из ${L.stages.length} пройден`;ob.classList.toggle('big',last);}
   // stars
   const os=$('overStars');if(starsShow){os.hidden=false;os.innerHTML=starsShow.map((v,i)=>`<span class="${v?'on':''}" style="animation-delay:${.2+i*.25}s" title="${GOALS[cfg.goals[i]].t}">★</span>`).join('');}else os.hidden=true;
   // places for bigger tables
@@ -2165,7 +2206,9 @@ function showOver(){
   const main=$('overMain'),alt=$('overAlt');
   if(cfg.kind==='camp'){const L=LOCS[cfg.li];let next=null;
     if(win){if(cfg.si+1<L.stages.length)next=[cfg.li,cfg.si+1];else if(cfg.li+1<LOCS.length)next=[cfg.li+1,0];}
-    if(next){main.textContent='Дальше';main.onclick=()=>{modal('over',false);clearAll();show('camp');openStage(next[0],next[1]);};}
+    const placeDone=win&&cfg.si===L.stages.length-1;
+    if(placeDone){main.textContent=next?'Дальше':'К карте';main.onclick=()=>{modal('over',false);clearAll();placeFinished(cfg.li,next);};}
+    else if(next){main.textContent='Следующий соперник';main.onclick=()=>{modal('over',false);clearAll();show('camp');openStage(next[0],next[1]);};}
     else{main.textContent='Ещё раз';main.onclick=()=>{modal('over',false);startGame(cfg);};}
     alt.textContent='К карте';alt.onclick=()=>{modal('over',false);clearAll();show('camp');};}
   else if(NET)netOverButtons(main,alt);
@@ -2174,14 +2217,23 @@ function showOver(){
   setTimeout(checkAch,900);
 }
 
-window.__durak={get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},showOver,startGame,get save(){return save;}};
+// a whole place of the journey is behind: a moment of its own, then the map with the new place lit up
+function placeFinished(li,next){const L=LOCS[li],got=L.stages.reduce((a,s,si)=>a+stageRec(L.id,si).stars.reduce((x,y)=>x+y,0),0);
+  $('pdT').textContent='Место пройдено!';
+  $('pdStars').innerHTML=`«${L.name}» · <span class="on">★</span> ${got} из 12`;
+  const N=next&&LOCS[next[0]];
+  $('pdNext').innerHTML=N?`Открыто новое место:<b>${N.name}</b><span>${N.rule}</span>`:'<b>Весь Царский путь пройден!</b><span>Вы — лучший игрок царства.</span>';
+  $('pdGo').textContent=N?'Отправиться':'К карте';
+  $('pdGo').onclick=()=>{modal('placeDone',false);show('camp');if(N){const el=$('locs').children[next[0]];if(el){el.scrollIntoView({block:'center'});el.classList.add('fresh');setTimeout(()=>el.classList.remove('fresh'),2600);}}};
+  chime(true);modal('placeDone',true);$('pdGo').focus();}
+window.__durak={placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},showOver,startGame,get save(){return save;}};
 applySpeed();show('home');
 
 /* ---------- friends' table: screens, connection and following the server ---------- */
 // The server address is set by the page (index.html) once the cloud part exists.
 const NET_API=window.__NET_API||'',NET_WS=window.__NET_WS||'',NET_SHARE=window.__NET_SHARE||'https://ttgms.github.io/durak/';
 const PHRASES=['Привет!','Ходи!','Ну ты даёшь!','Эх…','Хорошая игра!','Быстрее!','Ха-ха!','Спасибо!','Сейчас отыграюсь','Ой, всё','👍','😂','😮','😡','🎉','🙈'];
-const net={code:'',tok:'',room:null,m:null,q:[],have:0,cs:0,wait:false,ws:null,wsOk:false,rid:0,cb:{},skew:0,loop:0,busy:false,game:0,lastIn:0,lastPoll:0,lastApply:0,pumpT:0};
+const net={pend:[],code:'',tok:'',room:null,m:null,q:[],have:0,cs:0,wait:false,ws:null,wsOk:false,rid:0,cb:{},skew:0,loop:0,busy:false,game:0,lastIn:0,lastPoll:0,lastApply:0,pumpT:0};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 function netWait(){return net.wait;}
 const AVA_COL=['#c0392b','#2e6fb7','#2f8f5b','#8e44ad','#d68910','#16a085'];
@@ -2252,7 +2304,7 @@ function netTick(){
 /* ---------- the game: follow the server's log on our copy of the table ---------- */
 function netStartGame(snap,quiet){
   NET=true;net.game=net.room.game;net.q=[];net.wait=false;
-  net.m=new Mirror(snap,net.room.me,{reveal:netReveal});net.have=snap.logLen;
+  net.m=new Mirror(snap,net.room.me,{reveal:netReveal});net.have=snap.logLen;net.pend=[];
   const o=net.room.opts,fresh=snap.logLen===0&&!snap.over;
   startGame({kind:'online',mirror:net.m,fresh:fresh&&!quiet,mode:o.mode,deck:o.deck,level:o.level,rules:Object.assign({},o.rules,{timer:false}),skin:save.tableSkin,goals:null,opps:[]});
   $('chatBtn').hidden=false;}
@@ -2264,13 +2316,26 @@ function netPump(){
   if(!NET||!g||anim||!net.q.length||!net.m)return;
   // moves that arrive together are still shown one after another
   const gap=net.lastApply+380*SP()-Date.now();if(gap>0){net.pumpT=setTimeout(netPump,gap);return;}
-  const e=net.q.shift();net.lastApply=Date.now();
+  const e=net.q.shift();
+  // the confirmation of a move I already played
+  if(net.pend.length){const p=net.pend[0];
+    if(net.m.R(e.p)===0&&e.t===p.t&&(e.c||undefined)===p.c){net.pend.shift();const n0=g.events.length;
+      if(!net.m.echo(e,p)){netResync();return;}
+      if(g.events.length>n0||g.over){net.lastApply=Date.now();afterAction();}else netPump();return;}
+    netResync();return;}
+  net.lastApply=Date.now();
   if(!net.m.apply(e)){netResync();return;}
   if(net.m.R(e.p)!==0&&e.t==='take')botThinking=false;
   afterAction();}
 function netMove(m){
-  if(net.wait||!net.m)return;net.wait=true;markPlayable();
-  netReq('act',{m:net.m.wire(m)}).then(v=>{net.wait=false;netOn(v,v._since);if(v.err==='net'){gToast('Нет связи — ход не отправлен');markPlayable();}});}
+  if(net.wait||!net.m)return;const wire=net.m.wire(m);
+  // most moves go down at once and the server confirms them a moment later; a call-out waits for the server
+  if(m.t!=='acc'&&!net.q.length&&!resyncing){const p=net.m.local(m);if(!p){shake(m.c||g.hands[0][0]);return;}
+    net.pend.push(p);net.lastApply=Date.now();
+    netReq('act',{m:wire}).then(v=>{if(v.err){net.pend=[];if(v.err==='net')gToast('Нет связи — ход не дошёл');netResync();return;}netOn(v,v._since);});
+    afterAction();return;}
+  net.wait=true;markPlayable();
+  netReq('act',{m:wire}).then(v=>{net.wait=false;netOn(v,v._since);if(v.err==='net'){gToast('Нет связи — ход не отправлен');markPlayable();}});}
 function netAccused(e){const w=q=>q===0?'вас':CHR(seatChar[q]).short;
   if(e.p===0){if(e.caught){track.caught++;gToast(`Поймал! ${CHR(seatChar[e.loser]).short} забирает карты`);coinSnd();}else gToast('Обмана не было — карты забираете вы');}
   else if(e.caught)gToast(e.loser===0?`${CHR(seatChar[e.p]).short} поймал вас на обмане!`:`${CHR(seatChar[e.p]).short} поймал ${w(e.loser)}!`);
