@@ -1997,8 +1997,21 @@ function adCoinsLeft(){const d=dayKey();if(!save.adCoins||save.adCoins.d!==d)sav
 if(PF){$('tbIap').hidden=false;$('tbIap').onclick=()=>{shopTab='iap';renderShop();};
   // the treasury is also on the main menu, so nobody has to hunt for it
   $('hIap').onclick=()=>{audio();shopTab='iap';show('shop');};}
-function renderIapBar(){const b=$('hIap');if(!PF||!PF.store){b.hidden=true;return;}const prod=PF.store.products();b.hidden=!prod.length;
-  const na=prod.find(x=>x.id==='noads');$('hIapSub').textContent=noAds()?'Монеты и наборы':na?`Без рекламы за ${na.price} ₽, монеты и наборы`:'Без рекламы, монеты и наборы';}
+// the bar on the main menu sells one thing at a time, the most tempting one this player does not have yet,
+// and quietly turns to the next offer every few seconds
+const BAR_OFFERS=[
+  {id:'noads',ic:'🚫',t:'Играйте без рекламы',sub:p=>`Навсегда — всего за ${p} ₽`,skip:()=>noAds()},
+  {id:'starter',ic:'🎒',t:'Стартовый набор',sub:p=>`2 000 монет, рубашка и колода — ${p} ₽`,skip:()=>!!save.iap.starter},
+  {id:'boyar',ic:'👑',t:'Боярский пакет',sub:p=>`Без рекламы, монеты ×2 и особая рубашка — ${p} ₽`,skip:()=>!!save.iap.boyar},
+  {id:'coins10000',ic:'💰',t:'Царская казна',sub:p=>`10 000 монет — ${p} ₽`,skip:()=>false}];
+let barI=0,barT=0;
+function renderIapBar(){const b=$('hIap');if(!PF||!PF.store){b.hidden=true;return;}const prod=PF.store.products();
+  const list=BAR_OFFERS.filter(o=>!o.skip()&&prod.some(x=>x.id===o.id));b.hidden=!list.length;if(!list.length)return;
+  const o=list[barI%list.length],p=prod.find(x=>x.id===o.id).price;
+  b.querySelector('.ic').textContent=o.ic;b.querySelector('b').textContent=o.t;$('hIapSub').textContent=o.sub(p);
+  b.querySelector('.go').textContent='Смотреть ›';
+  clearTimeout(barT);if(list.length>1)barT=setTimeout(()=>{if($('home').hidden){barT=0;return;}b.classList.add('flip');
+    setTimeout(()=>{barI++;renderIapBar();b.classList.remove('flip');},250);},6000);}
 if(PF){addEventListener('pf-store',renderIapBar);renderIapBar();}
 const renderShop0=renderShop;
 renderShop=function(){
