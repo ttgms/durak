@@ -40,6 +40,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .pdnext{display:flex;flex-direction:column;gap:4px;margin:0 0 16px;font-size:14px;color:var(--paper-muted)}.pdnext b{font-family:var(--display);font-weight:400;font-size:24px;color:inherit}
 .pdnext b{color:var(--paper-ink,#3a2410)}
 .loc.fresh{animation:freshloc 2.6s ease both}@keyframes freshloc{0%,100%{box-shadow:0 0 0 0 rgba(243,213,138,0)}20%,60%{box-shadow:0 0 0 4px rgba(243,213,138,.9),0 0 30px rgba(243,213,138,.6)}}
+.pwarn{margin-top:12px;color:var(--paper-muted)}
 /* friends' table */
 .tin{font:500 17px var(--ui);padding:12px 16px;border-radius:14px;border:1.5px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:var(--ink);width:min(300px,100%);text-align:center;outline:none}
 .tin:focus{border-color:var(--gold)}
@@ -462,6 +463,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
     <button id="pNew" class="plain" type="button">Начать заново</button>
     <button id="pExit" class="plain" type="button">Выйти из партии</button>
   </div>
+  <p id="pWarn" class="hint pwarn" hidden>Если начать заново или выйти, партия засчитается как поражение.</p>
 </div></div>
 
 <div id="stageM" class="modal" hidden><div class="p">
@@ -1820,12 +1822,12 @@ function renderSettings(){
 }
 $('setDone').onclick=()=>modal('settings',false);
 let paused=false;
-$('toMenu').onclick=()=>{if(!g)return;$('pNew').hidden=!!NET;if(NET){modal('pause',true);$('pResume').focus();return;}paused=true;stopTimer();clearTimeout(botT);botThinking=false;if(extraPending){extraPending=false;anim=false;}modal('pause',true);$('pResume').focus();};
+$('toMenu').onclick=()=>{if(!g)return;$('pNew').hidden=!!NET;$('pWarn').hidden=!counts();$('pWarn').textContent=NET?'Если выйти, партия засчитается как поражение, а за вас доиграет бот.':'Если начать заново или выйти, партия засчитается как поражение.';if(NET){modal('pause',true);$('pResume').focus();return;}paused=true;stopTimer();clearTimeout(botT);botThinking=false;if(extraPending){extraPending=false;anim=false;}modal('pause',true);$('pResume').focus();};
 function resume(){modal('pause',false);paused=false;if(g&&!g.over&&!anim)proceed();}
 $('pResume').onclick=resume;
 $('pSet').onclick=()=>openSettings();
 $('pRules').onclick=()=>modal('rules',true);
-$('pNew').onclick=()=>{modal('pause',false);paused=false;startGame(cfg);};
+$('pNew').onclick=()=>{modal('pause',false);paused=false;forfeit();startGame(cfg);};
 $('pExit').onclick=()=>{modal('pause',false);paused=false;if(NET)return netLeave();leaveGame();};
 addEventListener('keydown',e=>{if(e.key!=='Escape')return;
   for(const id of ['rules','settings','stageM'])if(!$(id).hidden){modal(id,false);return;}
@@ -1837,7 +1839,7 @@ const table=$('table');
 let NET=false,g=null,cfg=null,seatChar=[],els={},anim=false,botT=0,botThinking=false,target=-1,pending=null;
 let masked=[],ghost=null,track=null,fastFwd=false,gen=0,myRun=false,extraPending=false,RU={},cheatSeen=-1,trumpSeen=true,chestCard=null,tmrT=0,tmrLeft=0;
 function clearAll(){gen++;stopTimer();clearTimeout(botT);botThinking=false;anim=false;fastFwd=false;myRun=false;extraPending=false;Object.values(els).forEach(e=>e.remove());els={};g=null;$('seats').innerHTML='';}
-function leaveGame(){const back=cfg&&cfg.kind==='camp'?'camp':cfg&&cfg.kind==='online'?'friends':'quick';clearAll();modal('over',false);show(back);}
+function leaveGame(){forfeit();const back=cfg&&cfg.kind==='camp'?'camp':cfg&&cfg.kind==='online'?'friends':'quick';clearAll();modal('over',false);show(back);}
 function startGame(c){
   cfg=c;clearAll();modal('over',false);$('overMain').disabled=false;show('table');setFaceStyle(save.face);
   const M=c.mirror,fresh=!M||c.fresh;if(fresh)shuffleSnd();
@@ -2097,6 +2099,7 @@ function talk(evs){
 }
 function afterAction(){
   const evs=g.events;g.events=[];talk(evs);
+  if(!NET&&!save.live&&counts()){save.live={mode:g.mode,deck:g.deckSize,n:g.n};persist();}
   if(target>=0&&(!g.table[target]||g.table[target].d))target=-1;
   const end=evs.find(e=>e.t==='bito'||e.t==='took');if(end)myRun=false;
   if(RU.cheat){const ch=cheatSeen>=0?cheatSeen:(evs.find(e=>e.cheat)||{}).p;if(end&&ch!=null&&ch>=0&&!evs.some(e=>e.t==='accuse')){if(ch===0)gToast('Обман сошёл с рук!');else{track.missed++;gToast(`${CHR(seatChar[ch]).short} сжульничал, а вы не заметили!`);}}cheatSeen=end?-1:g.cheater();}
@@ -2149,6 +2152,7 @@ function showOver(){
   const r={win,firstOut:g.out[0]===0,takes:track.takes,transfers:track.transfers,bouts:g.bouts,
     pogGiven:g.pogony>0&&fool>0&&track.lastOuts.includes(0)&&(g.lastPlayed[0]||[]).some(c=>c.r==='6'),pogGot:g.pogony>0&&fool===0};
   // statistics
+  save.live=null;
   const s=save.st;s.games++;if(win)s.wins++;else if(fool===0)s.losses++;else s.draws++;
   if(win){s.streak++;s.bestStreak=Math.max(s.bestStreak,s.streak);}else if(fool===0)s.streak=0;
   if(r.pogGiven)s.pogGiven++;if(r.pogGot)s.pogGot++;if(win&&r.takes===0)s.noTakeWins++;if(r.firstOut)s.firstOuts++;
@@ -2228,6 +2232,13 @@ function placeFinished(li,next){const L=LOCS[li],got=L.stages.reduce((a,s,si)=>a
   $('pdGo').onclick=()=>{modal('placeDone',false);show('camp');if(N){const el=$('locs').children[next[0]];if(el){el.scrollIntoView({block:'center'});el.classList.add('fresh');setTimeout(()=>el.classList.remove('fresh'),2600);}}};
   chime(true);modal('placeDone',true);$('pdGo').focus();}
 window.__durak={placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},showOver,startGame,get save(){return save;}};
+// a game you walk away from after it has begun counts as a loss: otherwise "start again" would wipe every defeat.
+// Closing the page mid-game counts the same, the next time the game opens.
+function counts(){return !!g&&!g.over&&g.active(0)&&(g.bouts>0||g.table.length>0);}
+function recordLoss(L){const s=save.st;s.games++;s.losses++;s.quits=(s.quits||0)+1;s.streak=0;
+  const bm=s.byMode[L.mode],bd=s.byDeck[L.deck]||(s.byDeck[L.deck]={g:0,w:0}),bp=s.byPlayers[L.n]||(s.byPlayers[L.n]={g:0,w:0});if(bm)bm.g++;bd.g++;bp.g++;}
+function forfeit(){if(counts()&&save.live)recordLoss(save.live);save.live=null;persist();}
+if(save.live){recordLoss(save.live);save.live=null;persist();}
 applySpeed();show('home');
 
 /* ---------- friends' table: screens, connection and following the server ---------- */
@@ -2362,7 +2373,7 @@ function netOverButtons(main,alt){const host=net.room.host===net.room.me;
   if(host){main.textContent='Ещё партию';main.disabled=false;main.onclick=()=>{main.disabled=true;netCall('start');};}
   else{main.textContent='Ждём хозяина стола…';main.disabled=true;}
   alt.textContent='Выйти из-за стола';alt.onclick=()=>{modal('over',false);netLeave();};}
-function netLeave(){const code=net.code;if(code)netReq('leave');netStopLoop();
+function netLeave(){if(NET&&counts())recordLoss({mode:g.mode,deck:g.deckSize,n:g.n});const code=net.code;if(code)netReq('leave');netStopLoop();
   NET=false;net.m=null;net.code='';net.room=null;net.q=[];save.net=Object.assign(save.net||{},{code:'',tok:''});persist();
   $('chatBtn').hidden=true;$('chatP').hidden=true;clearAll();modal('over',false);show('friends');}
 function netGone(msg){netStopLoop();NET=false;net.m=null;net.code='';net.room=null;save.net=Object.assign(save.net||{},{code:'',tok:''});persist();
