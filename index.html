@@ -42,12 +42,17 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .loc.fresh{animation:freshloc 2.6s ease both}@keyframes freshloc{0%,100%{box-shadow:0 0 0 0 rgba(243,213,138,0)}20%,60%{box-shadow:0 0 0 4px rgba(243,213,138,.9),0 0 30px rgba(243,213,138,.6)}}
 .pwarn{margin-top:12px;color:var(--paper-muted)}
 /* shop for money, ad buttons */
+.iapbar{width:min(360px,100%);display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:16px;cursor:pointer;font:inherit;text-align:left;
+  color:#3a2410;background:linear-gradient(#f7df9a,#e2b24c);border:1.5px solid #f9eab8;box-shadow:0 4px 0 #a8761e,0 8px 16px rgba(0,0,0,.25);transition:transform .1s}
+.iapbar:active{transform:translateY(3px);box-shadow:0 1px 0 #a8761e,0 4px 8px rgba(0,0,0,.25)}
+.iapbar .ic{font-size:26px}.iapbar .t{display:flex;flex-direction:column;flex:1;line-height:1.25}.iapbar b{font-size:16px}.iapbar .t span{font-size:13px;opacity:.85}
+.iapbar .go{font-weight:700;font-size:14px;white-space:nowrap}
 .iap .iapic{height:96px;display:grid;place-items:center;font-size:46px}.iap .iapic svg{height:96px;width:auto;border-radius:8px;box-shadow:0 3px 8px rgba(0,0,0,.25)}
 .iap.big{outline:2px solid #e6b450;outline-offset:-2px;background:linear-gradient(#fff8e6,#f5e3b8)}
 .adbtn{font-size:14px}#overRw .adbtn{display:block;margin:10px auto 0;color:var(--paper-ink);background:var(--paper2);border-color:#ddd1b8}
 #giftM .adbtn{color:var(--paper-ink);background:var(--paper2);border-color:#ddd1b8}
 .dailywrap{position:relative;width:min(360px,100%);display:flex;justify-content:center}.dailywrap .daily{width:100%}
-.dalt{position:absolute;right:8px;top:8px;padding:4px 10px;font-size:16px;border-radius:999px}
+.dalt{position:absolute;right:-8px;top:-10px;width:32px;height:32px;padding:0;font-size:16px;border-radius:50%;background:#3a2410;color:#ffe2a0;border:2px solid #e6b450;box-shadow:0 2px 6px rgba(0,0,0,.35)}
 #hintBtn{font-size:14px}
 .card.hint{animation:hintp 1s ease-in-out infinite;z-index:400!important}@keyframes hintp{0%,100%{box-shadow:0 0 0 3px #ffd76e,0 0 6px 2px rgba(255,215,110,.5)}50%{box-shadow:0 0 0 4px #fff1b8,0 0 22px 8px rgba(255,215,110,.95)}}
 /* friends' table */
@@ -364,6 +369,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
     <button id="hSet" class="mtile" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>Настройки</button>
     <button id="hRules" class="mtile" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h9a3 3 0 0 1 3 3v11H8a3 3 0 0 1-3-3z"/><path d="M8 9h6M8 12h6"/></svg>Правила</button>
   </nav>
+  <button id="hIap" class="iapbar" type="button" hidden><span class="ic">👑</span><span class="t"><b>Казна</b><span id="hIapSub">Без рекламы, монеты и наборы</span></span><span class="go">Перейти ›</span></button>
   <div class="dailywrap"><button id="hDaily" class="panel daily" type="button"><b>Задание дня</b><span id="dailyT"></span><em id="dailyR"></em></button><button id="dailyAlt" class="ghost dalt" type="button" hidden title="Сменить задание за рекламу" aria-label="Сменить задание за рекламу">↻</button></div>
   <div id="homeProg"></div>
 </div>
@@ -1789,7 +1795,7 @@ function renderShop(){
   const list=SHOP[shopTab],cur=shopTab==='backs'?save.back:shopTab==='faces'?save.face:save.tableSkin;
   $('shopGrid').innerHTML=list.map(it=>{const own=save.owned.includes(it.id);
     const prev=shopTab==='backs'?`<div class="prev">${backSVG(it.id)}</div>`:shopTab==='faces'?`<div class="fprev">${FACE_SAMPLE.map(c=>faceSVG(c,it.id)).join('')}</div>`:tablePreview(it.id);
-    let btn;if(cur===it.id)btn=`<div class="sel">✓ Выбрано</div>`;else if(own)btn=`<button class="plain" style="color:var(--paper-ink);background:var(--paper2);border-color:#ddd1b8" data-eq="${it.id}" type="button">Выбрать</button>`;
+    let btn;if(cur===it.id)btn=`<div class="sel">✓ Выбрано</div>`;else if(own)btn=`<button class="gold" data-eq="${it.id}" type="button">Выбрать</button>`;
     else if(it.price<0)btn=`<button class="gold" disabled type="button">Награда</button>`;
     else btn=`<button class="gold" data-buy="${it.id}" type="button" ${save.coins<it.price?'disabled':''}><span style="display:inline-flex;gap:6px;align-items:center"><span class="coin">₽</span>${it.price}</span></button>`;
     return `<div class="panel item">${prev}<h4>${it.name}</h4>${it.d?`<div class="d">${it.d}</div>`:''}<div class="how">${it.price<0&&!own?it.how+(it.id==='morozko'?` (${Math.min(save.st.dailyCount||0,7)} из 7)`:''):own?'В коллекции':''}</div>${btn}</div>`;}).join('');
@@ -2252,7 +2258,7 @@ function placeFinished(li,next){const L=LOCS[li],got=L.stages.reduce((a,s,si)=>a
   $('pdGo').textContent=N?'Отправиться':'К карте';
   $('pdGo').onclick=()=>{modal('placeDone',false);show('camp');if(N){const el=$('locs').children[next[0]];if(el){el.scrollIntoView({block:'center'});el.classList.add('fresh');setTimeout(()=>el.classList.remove('fresh'),2600);}}};
   chime(true);modal('placeDone',true);$('pdGo').focus();}
-window.__durak={placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},showOver,startGame,get save(){return save;}};
+window.__durak={applySkin,placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},showOver,startGame,get save(){return save;}};
 // a game you walk away from after it has begun counts as a loss: otherwise "start again" would wipe every defeat.
 // Closing the page mid-game counts the same, the next time the game opens.
 function counts(){return !!g&&!g.over&&g.active(0)&&(g.bouts>0||g.table.length>0);}
@@ -2511,7 +2517,12 @@ if(PF){applyOwned();addEventListener('pf-store',()=>{applyOwned();if(!$('shop').
 /* --- the «Казна» tab in the shop --- */
 const AD_COINS=60,AD_COINS_DAY=5;
 function adCoinsLeft(){const d=dayKey();if(!save.adCoins||save.adCoins.d!==d)save.adCoins={d,n:0};return AD_COINS_DAY-save.adCoins.n;}
-if(PF){$('tbIap').hidden=false;$('tbIap').onclick=()=>{shopTab='iap';renderShop();};}
+if(PF){$('tbIap').hidden=false;$('tbIap').onclick=()=>{shopTab='iap';renderShop();};
+  // the treasury is also on the main menu, so nobody has to hunt for it
+  $('hIap').onclick=()=>{audio();shopTab='iap';show('shop');};}
+function renderIapBar(){const b=$('hIap');if(!PF||!PF.store){b.hidden=true;return;}const prod=PF.store.products();b.hidden=!prod.length;
+  const na=prod.find(x=>x.id==='noads');$('hIapSub').textContent=noAds()?'Монеты и наборы':na?`Без рекламы за ${na.price} ₽, монеты и наборы`:'Без рекламы, монеты и наборы';}
+if(PF){addEventListener('pf-store',renderIapBar);renderIapBar();}
 const renderShop0=renderShop;
 renderShop=function(){
   $('tbIap').setAttribute('aria-selected',String(shopTab==='iap'));
@@ -2560,7 +2571,7 @@ function showHint(){if(!g||g.over||g.toMove()!==0)return;let m=null;try{m=aiMove
 function refreshAdButtons(){if(!PF)return;
   $('giftAd').hidden=!rewardedOk;$('dailyAlt').hidden=!rewardedOk||dailyDone();
   $('hintBtn').hidden=!rewardedOk||!g||NET||hintUsed||!!(g&&g.over);}
-const renderDaily0=renderDaily;renderDaily=function(){renderDaily0();refreshAdButtons();};
+const renderDaily0=renderDaily;renderDaily=function(){renderDaily0();refreshAdButtons();renderIapBar();};
 
 /* --- an ordinary ad between games: not before the second game, at most every 3.5 minutes, never mid-game --- */
 let lastFull=Date.now(),gamesHere=0;

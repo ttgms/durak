@@ -1272,7 +1272,7 @@ function renderShop(){
   const list=SHOP[shopTab],cur=shopTab==='backs'?save.back:shopTab==='faces'?save.face:save.tableSkin;
   $('shopGrid').innerHTML=list.map(it=>{const own=save.owned.includes(it.id);
     const prev=shopTab==='backs'?`<div class="prev">${backSVG(it.id)}</div>`:shopTab==='faces'?`<div class="fprev">${FACE_SAMPLE.map(c=>faceSVG(c,it.id)).join('')}</div>`:tablePreview(it.id);
-    let btn;if(cur===it.id)btn=`<div class="sel">✓ Выбрано</div>`;else if(own)btn=`<button class="plain" style="color:var(--paper-ink);background:var(--paper2);border-color:#ddd1b8" data-eq="${it.id}" type="button">Выбрать</button>`;
+    let btn;if(cur===it.id)btn=`<div class="sel">✓ Выбрано</div>`;else if(own)btn=`<button class="gold" data-eq="${it.id}" type="button">Выбрать</button>`;
     else if(it.price<0)btn=`<button class="gold" disabled type="button">Награда</button>`;
     else btn=`<button class="gold" data-buy="${it.id}" type="button" ${save.coins<it.price?'disabled':''}><span style="display:inline-flex;gap:6px;align-items:center"><span class="coin">₽</span>${it.price}</span></button>`;
     return `<div class="panel item">${prev}<h4>${it.name}</h4>${it.d?`<div class="d">${it.d}</div>`:''}<div class="how">${it.price<0&&!own?it.how+(it.id==='morozko'?` (${Math.min(save.st.dailyCount||0,7)} из 7)`:''):own?'В коллекции':''}</div>${btn}</div>`;}).join('');
@@ -1735,7 +1735,7 @@ function placeFinished(li,next){const L=LOCS[li],got=L.stages.reduce((a,s,si)=>a
   $('pdGo').textContent=N?'Отправиться':'К карте';
   $('pdGo').onclick=()=>{modal('placeDone',false);show('camp');if(N){const el=$('locs').children[next[0]];if(el){el.scrollIntoView({block:'center'});el.classList.add('fresh');setTimeout(()=>el.classList.remove('fresh'),2600);}}};
   chime(true);modal('placeDone',true);$('pdGo').focus();}
-window.__durak={placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},showOver,startGame,get save(){return save;}};
+window.__durak={applySkin,placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},showOver,startGame,get save(){return save;}};
 // a game you walk away from after it has begun counts as a loss: otherwise "start again" would wipe every defeat.
 // Closing the page mid-game counts the same, the next time the game opens.
 function counts(){return !!g&&!g.over&&g.active(0)&&(g.bouts>0||g.table.length>0);}
@@ -1994,7 +1994,12 @@ if(PF){applyOwned();addEventListener('pf-store',()=>{applyOwned();if(!$('shop').
 /* --- the «Казна» tab in the shop --- */
 const AD_COINS=60,AD_COINS_DAY=5;
 function adCoinsLeft(){const d=dayKey();if(!save.adCoins||save.adCoins.d!==d)save.adCoins={d,n:0};return AD_COINS_DAY-save.adCoins.n;}
-if(PF){$('tbIap').hidden=false;$('tbIap').onclick=()=>{shopTab='iap';renderShop();};}
+if(PF){$('tbIap').hidden=false;$('tbIap').onclick=()=>{shopTab='iap';renderShop();};
+  // the treasury is also on the main menu, so nobody has to hunt for it
+  $('hIap').onclick=()=>{audio();shopTab='iap';show('shop');};}
+function renderIapBar(){const b=$('hIap');if(!PF||!PF.store){b.hidden=true;return;}const prod=PF.store.products();b.hidden=!prod.length;
+  const na=prod.find(x=>x.id==='noads');$('hIapSub').textContent=noAds()?'Монеты и наборы':na?`Без рекламы за ${na.price} ₽, монеты и наборы`:'Без рекламы, монеты и наборы';}
+if(PF){addEventListener('pf-store',renderIapBar);renderIapBar();}
 const renderShop0=renderShop;
 renderShop=function(){
   $('tbIap').setAttribute('aria-selected',String(shopTab==='iap'));
@@ -2043,7 +2048,7 @@ function showHint(){if(!g||g.over||g.toMove()!==0)return;let m=null;try{m=aiMove
 function refreshAdButtons(){if(!PF)return;
   $('giftAd').hidden=!rewardedOk;$('dailyAlt').hidden=!rewardedOk||dailyDone();
   $('hintBtn').hidden=!rewardedOk||!g||NET||hintUsed||!!(g&&g.over);}
-const renderDaily0=renderDaily;renderDaily=function(){renderDaily0();refreshAdButtons();};
+const renderDaily0=renderDaily;renderDaily=function(){renderDaily0();refreshAdButtons();renderIapBar();};
 
 /* --- an ordinary ad between games: not before the second game, at most every 3.5 minutes, never mid-game --- */
 let lastFull=Date.now(),gamesHere=0;
