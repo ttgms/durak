@@ -1959,7 +1959,8 @@ function canUse(c,cheat){if(!g||g.over||anim||paused||!g.active(0)||(NET&&netWai
   if(g.def!==0)return g.canAttack(0,c);
   return g.canTransfer(0,c)||g.table.some((x,i)=>g.canDefend(0,c,i));}
 function markPlayable(){if(!g)return;const hl=save.set.hl&&!RU.nohint&&(trumpSeen||g.def!==0),active=!g.over&&!anim&&!paused&&g.active(0)&&((!botThinking&&g.toMove()===0)||(myRun&&g.def!==0));
-  const okAll=active&&g.hands[0].every(c=>masked.includes(c)||canUse(c));
+  // only an opening move (empty table, any card goes) is left unmarked; when beating or adding, the frame shows what fits
+  const okAll=active&&!g.table.length&&g.hands[0].every(c=>masked.includes(c)||canUse(c));
   g.hands[0].forEach(c=>{const e=els[c.id];if(masked.includes(c)){e.classList.remove('play','dim');return;}const ok=active&&canUse(c);
     e.classList.toggle('play',hl&&ok&&!okAll);e.classList.toggle('dim',hl&&active&&!ok&&g.table.length>0);e.style.cursor=ok?'pointer':'';});}
 function shake(c){const e=els[c.id];e.classList.remove('shake');void e.offsetWidth;e.classList.add('shake');}
