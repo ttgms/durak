@@ -848,7 +848,8 @@ function topLists(store,now,me){
 // Needs rules.js (shop, achievements, tasks) and quick.js (accounts) in scope.
 
 const AD_COINS=60,AD_COINS_DAY=5,BAIL_COINS=500,MIGRATE_MAX=50000;
-const ADS_PLAT=new Set(['pikabu','web']); // coins for watching ads exist only where the platform pays well for them
+const ADS_PLAT=new Set(['pikabu','web']); // gift doubling and task swaps for ads: only where the platform pays well for them
+const REWARD_PLAT=new Set(['pikabu','web','vk']); // coins for an ad and doubling a win: everywhere with rewarded ads (VK and OK too)
 
 function ecoOf(x){if(!x.eco){x.eco=freshEco();}return x.eco;}
 // what the browser gets: everything it needs to draw, nothing secret
@@ -889,7 +890,7 @@ function ecoOp(store,ac,req,now){
       e.gift={day:today,streak};gain(e,amount);res.amount=amount;}}
   else if(op==='giftx2'){if(!ADS_PLAT.has(plat))err='no ads';else if(e.gift.day!==today||e.gift.dbl===today)err='no gift';
     else{const amount=GIFTS[e.gift.streak-1]||0;e.gift.dbl=today;gain(e,amount);res.amount=amount;}}
-  else if(op==='adcoins'){if(!ADS_PLAT.has(plat))err='no ads';else{if(!e.adCoins||e.adCoins.d!==today)e.adCoins={d:today,n:0};
+  else if(op==='adcoins'){if(!REWARD_PLAT.has(plat))err='no ads';else{if(!e.adCoins||e.adCoins.d!==today)e.adCoins={d:today,n:0};
     if(e.adCoins.n>=AD_COINS_DAY)err='limit';else{e.adCoins.n++;gain(e,AD_COINS);res.amount=AD_COINS;}}}
   else if(op==='dalt'){if(!ADS_PLAT.has(plat))err='no ads';else if(e.daily&&e.daily.day===today&&e.daily.done)err='done';
     else e.dailyAlt={day:today,n:(e.dailyAlt&&e.dailyAlt.day===today?e.dailyAlt.n:0)+1};}
@@ -983,7 +984,7 @@ function soloLeave(store,room,now){if(!room.solo)return;const s=room.seats[0];if
   if(e.live&&e.live.code===room.code)e.live=null;room.st='closed';room.v++;accPut(store,s.ac,x);}
 // doubling the coins of the last win for an ad (where there are ads)
 function winDouble(store,ac,req,now){const x=accGet(store,ac,now),e=ecoOf(x),news=[];
-  if(/^(vk|ok)user/.test(ac)||!ADS_PLAT.has(String(req.plat||'web')))return Object.assign(ecoView(x),{err:'no ads'});
+  if(!REWARD_PLAT.has(/^(vk|ok)user/.test(ac)?'vk':String(req.plat||'web')))return Object.assign(ecoView(x),{err:'no ads'});
   if(!e.lastWin||e.lastWin.code!==req.code)return Object.assign(ecoView(x),{err:'no win'});
   const a=e.lastWin.amount;e.lastWin=null;gain(e,a);payAch(e,news,now);accPut(store,ac,x);return Object.assign(ecoView(x,news),{amount:a});}
 

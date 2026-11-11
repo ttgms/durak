@@ -2716,7 +2716,8 @@ const COINS_OF={coins3000:3000,coins10000:10000,coins30000:30000,coins100000:100
 // purchases are given by the server (it checks them with the platform), never here
 const noAds=()=>!!(save.iap&&(save.iap.noads||save.iap.boyar));
 // coins for watching ads are not offered in VK and OK (there people pay with votes); the hint for an ad stays everywhere
-const AD_GIFTS=PLAT!=='vk'&&PLAT!=='ok';
+const AD_GIFTS=PLAT!=='vk'&&PLAT!=='ok'; // gift doubling and task swaps for ads
+const AD_REWARDS=true; // coins for an ad and doubling a win against bots: on every platform
 // ads pause the game's sound
 function withAd(show){if(!PF)return Promise.resolve(null);const wasPaused=paused;paused=true;try{if(ac)ac.suspend();}catch(e){}
   const back=r=>{paused=wasPaused;try{if(ac&&!document.hidden)ac.resume();}catch(e){}return r;};
@@ -2745,7 +2746,7 @@ if(PF){$('tbIap').hidden=!PF.store; // no treasury where the platform sells noth
 // the bar on the main menu sells one thing at a time, the most tempting one this player does not have yet,
 // and quietly turns to the next offer every few seconds
 const BAR_OFFERS=[
-  {id:'noads',ic:'🚫',t:'Играйте без рекламы',sub:p=>`Навсегда — всего за ${fmtP(p)}`,skip:()=>noAds()||!AD_GIFTS},
+  {id:'noads',ic:'🚫',t:'Играйте без рекламы',sub:p=>`Навсегда — всего за ${fmtP(p)}`,skip:()=>noAds()},
   {id:'coins30000',ic:'🧰',t:'Сундук золота',sub:p=>`30 000 монет на ставки — ${fmtP(p)}`,skip:()=>false},
   {id:'starter',ic:'🎒',t:'Стартовый набор',sub:p=>`2 000 монет, рубашка и колода — ${fmtP(p)}`,skip:()=>!!save.iap.starter},
   {id:'boyar',ic:'👑',t:'Боярский пакет',sub:p=>`Без рекламы, монеты ×2 и особая рубашка — ${fmtP(p)}`,skip:()=>!!save.iap.boyar},
@@ -2767,10 +2768,10 @@ renderShop=function(){
   const st=PF&&PF.store,prod=st?st.products():[];
   const price=id=>{const p=prod.find(x=>x.id===id);return p?p.price:null;};
   let h='';
-  if(AD_GIFTS&&(rewardedOk||adCoinsLeft()>0)){const left=adCoinsLeft();
+  if(AD_REWARDS&&(rewardedOk||adCoinsLeft()>0)){const left=adCoinsLeft();
     h+=`<div class="panel item iap ad"><div class="iapic">🎁</div><h4>Монеты за рекламу</h4><div class="d">+${AD_COINS} монет за короткий ролик</div><div class="how">Осталось сегодня: ${left} из ${AD_COINS_DAY}</div>
       <button class="gold" id="adCoins" type="button" ${left<=0||!rewardedOk?'disabled':''}>Смотреть</button></div>`;}
-  for(const it of IAP){if(it.id==='noads'&&!AD_GIFTS)continue;const pr=price(it.id),have=!COINS_OF[it.id]&&save.iap[it.id];
+  for(const it of IAP){const pr=price(it.id),have=!COINS_OF[it.id]&&save.iap[it.id];
     if(pr==null&&(it.id==='coins30000'||it.id==='coins100000'))continue; // a pack this platform does not sell yet
     const bought=have||(it.id==='noads'&&save.iap.boyar);
     h+=`<div class="panel item iap${it.big?' big':''}"><div class="iapic">${it.id==='boyar'?backSVG('boyar'):it.id==='noads'?'🚫':it.id==='starter'?'🎒':it.id==='coins100000'?'👑':it.id==='coins30000'?'🧰':'💰'}</div><h4>${it.name}</h4><div class="d">${it.d}</div>
@@ -2789,7 +2790,7 @@ renderShop=function(){
 
 /* --- rewards for watching: double the win, double the daily gift, swap the daily task, a hint --- */
 function moneyOver(win){
-  const box=$('overRw');if(!PF||!AD_GIFTS||!win||lastWin<=0||!rewardedOk)return;
+  const box=$('overRw');if(!PF||!AD_REWARDS||!win||lastWin<=0||!rewardedOk)return;
   box.insertAdjacentHTML('beforeend',`<button id="adDouble" class="plain adbtn" type="button">📺 Удвоить: +${lastWin} за рекламу</button>`);
   const code=net.code;$('adDouble').onclick=()=>{const b=$('adDouble');b.disabled=true;rewarded().then(ok=>ok?ecoCall('winx2',{code}):null).then(v=>{if(v&&v.amount){coinSnd();b.textContent='✓ Монеты удвоены';}else b.disabled=false;checkRewarded();});};}
 if(PF){
