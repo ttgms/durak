@@ -1893,7 +1893,7 @@ $('lChatP').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('lChatP').hid
 
 /* ---------- screens: friends' menu and the table before the game ---------- */
 if(!save.net)save.net={name:'',code:'',tok:''};
-function renderFriends(){$('fName').value=save.net.name||'';
+function renderFriends(){$('fName').value=save.net.name||(window.__PF&&window.__PF.userName)||'';
   const back=!!(save.net.code&&save.net.tok);$('fBack').hidden=!back;if(back)$('fBackCode').textContent=save.net.code;
   $('fOff').hidden=!!NET_API;$('fCreate').disabled=!NET_API;$('fJoin').disabled=!NET_API;}
 function myName(){const v=$('fName').value.replace(/[<>&"'`\\]/g,'').trim().slice(0,14);save.net.name=v;persist();return v||'Игрок';}
@@ -1909,8 +1909,10 @@ $('fJoin').onclick=()=>{audio();const code=$('fCode').value.trim();if(!code){$('
 $('fCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('fJoin').click();});
 $('fBack').onclick=()=>{audio();$('fMsg').textContent='Подключаемся…';netReq('join',{code:save.net.code,name:myName(),tok:save.net.tok}).then(v=>{if(v&&v.err){save.net.code='';save.net.tok='';persist();renderFriends();}netEnter(v);});};
 $('lLeave').onclick=()=>netLeave();
-function shareLink(){return NET_SHARE+'?t='+encodeURIComponent(net.code);}
+// a platform may have its own link to the game (and its own way to share it)
+function shareLink(){const P=window.__PF;return P&&P.shareLink?P.shareLink(net.code):NET_SHARE+'?t='+encodeURIComponent(net.code);}
 $('lShare').onclick=()=>{const url=shareLink(),text='Садись со мной за стол в «Дурака»! Код стола: '+net.code;
+  if(window.__PF&&window.__PF.share){window.__PF.share(url,text);return;}
   if(navigator.share)navigator.share({title:'Дурак: Царский турнир',text,url}).catch(()=>{});else copyText(text+' '+url);};
 $('lCopy').onclick=()=>copyText(shareLink());
 function copyText(t){const ok=()=>{$('lCopy').textContent='Скопировано!';setTimeout(()=>$('lCopy').textContent='Скопировать ссылку',1600);};
@@ -1953,7 +1955,7 @@ function renderLobby(){
   $('lStart').hidden=!host;$('lWait').textContent=host?(open?'Свободные места займут боты, если начать сейчас.':''):'Хозяин стола начнёт игру, когда все соберутся.';}
 $('lStart').onclick=()=>{audio();netCall('start');};
 // a link with ?t=CODE opens the friends' screen ready to join
-(function(){try{const t=new URLSearchParams(location.search).get('t');if(t){$('fCode').value=t;show('friends');renderFriends();$('fMsg').textContent='Введите имя и нажмите «Войти».';}}catch(e){}})();
+(function(){try{const t=new URLSearchParams(location.search).get('t')||(window.__PF&&window.__PF.startCode);if(t){$('fCode').value=t;show('friends');renderFriends();$('fMsg').textContent='Введите имя и нажмите «Войти».';}}catch(e){}})();
 
 /* ---------- shop for real money and ads for rewards (only where the platform offers them: Pikabu) ---------- */
 // window.__PF is set by the platform page before the game starts; the plain site has none, and all of this stays hidden.
@@ -1965,6 +1967,8 @@ const IAP=[
   {id:'starter',name:'Стартовый набор',d:'2 000 монет, рубашка «Городец» и колода «Русская»'},
   {id:'coins3000',name:'Мешок монет',d:'3 000 монет'},
   {id:'coins10000',name:'Царская казна',d:'10 000 монет — больше всего монет за рубль'}];
+// prices are roubles on most platforms; VK and OK sell for their own votes
+const fmtP=p=>PF&&PF.fmt?PF.fmt(p):p+' ₽';
 const COINS_OF={coins3000:3000,coins10000:10000};
 function own(id){if(!save.owned.includes(id))save.owned.push(id);}
 // what a product gives; permanent ones are given once and remembered
@@ -2000,10 +2004,10 @@ if(PF){$('tbIap').hidden=false;$('tbIap').onclick=()=>{shopTab='iap';renderShop(
 // the bar on the main menu sells one thing at a time, the most tempting one this player does not have yet,
 // and quietly turns to the next offer every few seconds
 const BAR_OFFERS=[
-  {id:'noads',ic:'🚫',t:'Играйте без рекламы',sub:p=>`Навсегда — всего за ${p} ₽`,skip:()=>noAds()},
-  {id:'starter',ic:'🎒',t:'Стартовый набор',sub:p=>`2 000 монет, рубашка и колода — ${p} ₽`,skip:()=>!!save.iap.starter},
-  {id:'boyar',ic:'👑',t:'Боярский пакет',sub:p=>`Без рекламы, монеты ×2 и особая рубашка — ${p} ₽`,skip:()=>!!save.iap.boyar},
-  {id:'coins10000',ic:'💰',t:'Царская казна',sub:p=>`10 000 монет — ${p} ₽`,skip:()=>false}];
+  {id:'noads',ic:'🚫',t:'Играйте без рекламы',sub:p=>`Навсегда — всего за ${fmtP(p)}`,skip:()=>noAds()},
+  {id:'starter',ic:'🎒',t:'Стартовый набор',sub:p=>`2 000 монет, рубашка и колода — ${fmtP(p)}`,skip:()=>!!save.iap.starter},
+  {id:'boyar',ic:'👑',t:'Боярский пакет',sub:p=>`Без рекламы, монеты ×2 и особая рубашка — ${fmtP(p)}`,skip:()=>!!save.iap.boyar},
+  {id:'coins10000',ic:'💰',t:'Царская казна',sub:p=>`10 000 монет — ${fmtP(p)}`,skip:()=>false}];
 let barI=0,barT=0;
 function renderIapBar(){const b=$('hIap');if(!PF||!PF.store){b.hidden=true;return;}const prod=PF.store.products();
   const list=BAR_OFFERS.filter(o=>!o.skip()&&prod.some(x=>x.id===o.id));b.hidden=!list.length;if(!list.length)return;
@@ -2027,7 +2031,7 @@ renderShop=function(){
   for(const it of IAP){const pr=price(it.id),have=!COINS_OF[it.id]&&save.iap[it.id];
     const bought=have||(it.id==='noads'&&save.iap.boyar);
     h+=`<div class="panel item iap${it.big?' big':''}"><div class="iapic">${it.id==='boyar'?backSVG('boyar'):it.id==='noads'?'🚫':it.id==='starter'?'🎒':'💰'}</div><h4>${it.name}</h4><div class="d">${it.d}</div>
-      ${bought?'<div class="sel">✓ Куплено</div>':pr==null?'<button class="gold" disabled type="button">Недоступно</button>':`<button class="gold" data-iap="${it.id}" type="button">${pr} ₽</button>`}</div>`;}
+      ${bought?'<div class="sel">✓ Куплено</div>':pr==null?'<button class="gold" disabled type="button">Недоступно</button>':`<button class="gold" data-iap="${it.id}" type="button">${fmtP(pr)}</button>`}</div>`;}
   $('shopGrid').innerHTML=h;
   const ac0=$('adCoins');if(ac0)ac0.onclick=()=>{if(adCoinsLeft()<=0)return;ac0.disabled=true;rewarded().then(ok=>{if(ok){save.adCoins.n++;addCoins(AD_COINS);coinSnd();}checkRewarded();renderShop();});};
   $('shopGrid').querySelectorAll('[data-iap]').forEach(b=>b.onclick=()=>{const id=b.dataset.iap;b.disabled=true;b.textContent='Оплата…';
