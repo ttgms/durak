@@ -2235,7 +2235,8 @@ function proceed(){
   if(!g)return;if(!trumpSeen&&!g.deck.length){trumpSeen=true;gToast('Колода кончилась. Козырь: '+SUIT_NAME_RU[g.trump]);}
   if(chestCard&&!track.chest&&g.hands[0].includes(chestCard)){track.chest=true;gToast('Клад! +'+CHEST_COINS+' монет в конце партии');}
   stopTimer();layout();
-  if(g.over){setActs([]);$('status').textContent='';$('skipOut').hidden=true;const my=gen;setTimeout(()=>{if(my===gen)showOver();},fastFwd?50:600);return;}
+  if(g.over){setActs([]);$('status').textContent='';$('skipOut').hidden=true;if(NET)netPump(); // the server's last word shows everyone's cards
+    const my=gen;setTimeout(()=>{if(my===gen)showOver();},fastFwd?50:600);return;}
   if(paused){updateControls();return;}
   if(NET){botThinking=false;updateControls();netPump();return;}
   const tm=g.toMove();
@@ -2329,7 +2330,7 @@ function placeFinished(li,next){const L=LOCS[li],got=L.stages.reduce((a,s,si)=>a
   $('pdGo').textContent=N?'Отправиться':'К карте';
   $('pdGo').onclick=()=>{modal('placeDone',false);show('camp');if(N){const el=$('locs').children[next[0]];if(el){el.scrollIntoView({block:'center'});el.classList.add('fresh');setTimeout(()=>el.classList.remove('fresh'),2600);}}};
   chime(true);modal('placeDone',true);$('pdGo').focus();}
-window.__durak={applySkin,placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},showOver,startGame,get save(){return save;}};
+window.__durak={applySkin,placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},get anim(){return anim;},get els(){return els;},showOver,startGame,get save(){return save;}};
 // a game you walk away from after it has begun counts as a loss: otherwise "start again" would wipe every defeat.
 // Closing the page mid-game counts the same, the next time the game opens.
 function counts(){return !!g&&!g.over&&g.active(0)&&(g.bouts>0||g.table.length>0);}
@@ -2426,7 +2427,9 @@ function netStartGame(snap,quiet){
   $('chatBtn').hidden=false;}
 // a stand-in card turned out to be a real one: its picture changes, its place in the game stays
 function netReveal(old,obj){const e=els[old];if(!e)return;delete els[old];els[obj.id]=e;
-  e.querySelector('.f').innerHTML=faceSVG(obj);e.setAttribute('aria-label',obj.r==='J'?(obj.s==='r'?'красный джокер':'чёрный джокер'):obj.r+' '+SUIT_NAME[obj.s]);}
+  e.querySelector('.f').innerHTML=faceSVG(obj);e.setAttribute('aria-label',obj.r==='J'?(obj.s==='r'?'красный джокер':'чёрный джокер'):obj.r+' '+SUIT_NAME[obj.s]);
+  // the card was lying face down while unknown: turn it over now, not at the next move
+  clearTimeout(net.rvT);net.rvT=setTimeout(()=>{if(g&&!anim)layout();},0);}
 function netPump(){
   clearTimeout(net.pumpT);
   if(!NET||!g||anim||!net.q.length||!net.m)return;
@@ -2435,9 +2438,9 @@ function netPump(){
   const e=net.q.shift();
   // the confirmation of a move I already played
   if(net.pend.length){const p=net.pend[0];
-    if(net.m.R(e.p)===0&&e.t===p.t&&(e.c||undefined)===p.c){net.pend.shift();const n0=g.events.length;
+    if(net.m.R(e.p)===0&&e.t===p.t&&(e.c||undefined)===p.c){net.pend.shift();const n0=g.events.length,was=g.over;
       if(!net.m.echo(e,p)){netResync();return;}
-      if(g.events.length>n0||g.over){net.lastApply=Date.now();afterAction();}else netPump();return;}
+      if(g.events.length>n0||(g.over&&!was)){net.lastApply=Date.now();afterAction();}else{layout();updateControls();netPump();}return;}
     netResync();return;}
   net.lastApply=Date.now();
   if(!net.m.apply(e)){netResync();return;}
