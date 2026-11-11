@@ -2388,7 +2388,11 @@ function netTick(){
   if(!net.busy&&(now-net.lastPoll>every||(overdue&&now-net.lastPoll>2500)||(net.wsOk&&r&&r.st==='play'&&!mine&&now-net.lastIn>6000&&now-net.lastPoll>3000))){
     net.busy=true;net.lastPoll=now;netCall('poll').then(()=>{net.busy=false;},()=>{net.busy=false;});}
   netTimer();
-  if(net.room&&net.room.q&&net.room.st==='lobby'&&!$('lobby').hidden)lobbyCountdown();}
+  if(net.room&&net.room.q&&net.room.st==='lobby'&&!$('lobby').hidden)lobbyCountdown();
+  // my own card must never stay unknown once everything sent has come back: if it does, take the table again
+  if(NET&&net.m&&g&&!g.over&&!anim&&!net.pend.length&&!net.q.length&&g.hands[0].some(c=>c.ph)){
+    if(!net.phSince)net.phSince=now;else if(now-net.phSince>1500){net.phSince=0;console.warn('[net] own card unknown, taking the table again');netResync();}}
+  else net.phSince=0;}
 
 /* ---------- the game: follow the server's log on our copy of the table ---------- */
 function netStartGame(snap,quiet){
