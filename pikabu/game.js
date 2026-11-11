@@ -1940,10 +1940,11 @@ $('hArena').onclick=()=>{audio();show('arena');};
 // a platform may have its own link to the game (and its own way to share it)
 function shareLink(){const P=window.__PF;return P&&P.shareLink?P.shareLink(net.code):NET_SHARE+'?t='+encodeURIComponent(net.code);}
 $('lShare').onclick=()=>{const url=shareLink(),text='Садись со мной за стол в «Дурака»! Код стола: '+net.code;
+  if(!url){copyText(text);return;} // no link on this platform: the code is enough to sit down
   if(window.__PF&&window.__PF.share){window.__PF.share(url,text);return;}
   if(navigator.share)navigator.share({title:'Дурак: Царский турнир',text,url}).catch(()=>{});else copyText(text+' '+url);};
-$('lCopy').onclick=()=>copyText(shareLink());
-function copyText(t){const ok=()=>{$('lCopy').textContent='Скопировано!';setTimeout(()=>$('lCopy').textContent='Скопировать ссылку',1600);};
+$('lCopy').onclick=()=>copyText(shareLink()||('Код стола: '+net.code));
+function copyText(t){const ok=()=>{$('lCopy').textContent='Скопировано!';setTimeout(()=>$('lCopy').textContent=shareLink()?'Скопировать ссылку':'Скопировать код',1600);};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(ok,()=>prompt('Ссылка на стол:',t));else prompt('Ссылка на стол:',t);}
 const RULE_CHIPS=[['neighbors','Только соседи'],['show','Перевод показом'],['noLimit','Без лимита'],['teams','Пара на пару'],['cheat','Шулерство'],['open','Открытые карты'],['fog','Туман'],['dark','Тёмный козырь'],['chest','Клад']];
 const RULE_NEED={neighbors:o=>o.n<3?'от 3 игроков':'',show:o=>o.mode!=='perevodnoy'?'в переводном':'',teams:o=>o.n!==4?'ровно 4 игрока':'',fog:o=>o.rules.open?'не с открытыми':''};
@@ -1957,7 +1958,7 @@ function renderLobby(){
     const open=r.seats.filter(x=>x.k==='o').length;$('lSub').textContent=`${MODE_NAME[r.opts.mode]}, ${plural(r.seats.length,'игрок','игрока','игроков')}`+(open?` · свободно ${open}`:'');
     $('lSeats').innerHTML=r.seats.map((x,i)=>`<div class="lseat">${x.k==='h'?`<span class="pic">${avatarSVG(x.nm,i)}</span><b>${esc(x.nm)}</b>${i===r.me?'<em>вы</em>':''}`:`<span class="pic free">+</span><b class="dim">Ждём игрока…</b>`}</div>`).join('');
     $('lOpts').innerHTML='';$('lStart').hidden=true;$('lWait').textContent='Если никто не придёт, свободные места займут боты.';return;}
-  $('lCodeL').textContent='Код стола';
+  $('lCodeL').textContent='Код стола';$('lCopy').textContent=shareLink()?'Скопировать ссылку':'Скопировать код';
   const r=net.room,host=r.host===r.me,o=r.opts,maxN={24:4,36:5,52:6,54:6}[o.deck];
   $('lCode').textContent=r.code;
   const ppl=r.seats.filter(x=>x.k==='h').length,open=r.seats.filter(x=>x.k==='o').length;
@@ -2155,7 +2156,8 @@ if(PF){applyOwned();addEventListener('pf-store',()=>{applyOwned();if(!$('shop').
 /* --- the «Казна» tab in the shop --- */
 const AD_COINS=60,AD_COINS_DAY=5;
 function adCoinsLeft(){const d=dayKey();return AD_COINS_DAY-(save.adCoins&&save.adCoins.d===d?save.adCoins.n:0);}
-if(PF){$('tbIap').hidden=false;$('tbIap').onclick=()=>{shopTab='iap';renderShop();};
+if(PF){$('tbIap').hidden=!PF.store; // no treasury where the platform sells nothing (VK on iPhone)
+  $('tbIap').onclick=()=>{shopTab='iap';renderShop();};
   // the treasury is also on the main menu, so nobody has to hunt for it
   $('hIap').onclick=()=>{audio();shopTab='iap';show('shop');};}
 // the bar on the main menu sells one thing at a time, the most tempting one this player does not have yet,
