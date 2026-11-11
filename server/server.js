@@ -381,24 +381,30 @@ function sanitizeOpts(o){o=o||{};const deck=[24,36,52,54].includes(+o.deck)?+o.d
   const level=['easy','medium','hard'].includes(o.level)?o.level:'medium';
   return {deck,n,mode,rules,timer,level};}
 
-function newRoom(opts,name,now,rnd){
+function newRoom(opts,name,now,rnd,ac,q){
   const o=sanitizeOpts(opts),tok=rndToken(rnd);
   const room={code:makeCode(rnd),v:1,born:now,exp:now+ROOM_TTL,opts:o,host:0,st:'lobby',seed:0,game:0,log:[],at:now,dl:0,chat:[],ci:0,fin:null,seats:[]};
-  for(let i=0;i<o.n;i++)room.seats.push(i===0?{k:'h',nm:cleanName(name),tok,seen:now}:{k:'o'});
+  // an open table (quick game): it starts by itself after a short wait, and the game has a stake
+  if(q){room.q=q;room.qAt=now+QUICK_WAIT;}
+  for(let i=0;i<o.n;i++)room.seats.push(i===0?Object.assign({k:'h',nm:cleanName(name),tok,seen:now},ac?{ac}:{}):{k:'o'});
   return {room,seat:0,tok};}
 
 function seatOf(room,tok){return tok?room.seats.findIndex(s=>s.k==='h'&&s.tok===tok):-1;}
 function humans(room){return room.seats.filter(s=>s.k==='h').length;}
 
-function join(room,name,now,rnd,tok){
+function join(room,name,now,rnd,tok,ac){
   const was=seatOf(room,tok);if(was>=0){room.seats[was].seen=now;room.seats[was].away=false;return {seat:was,tok};}
   if(room.st!=='lobby'){ // a game is on: a newcomer may take over a seat a bot is keeping for someone who left
     return {err:'started'};}
   const i=room.seats.findIndex(s=>s.k==='o');if(i<0)return {err:'full'};
-  const t=rndToken(rnd);room.seats[i]={k:'h',nm:cleanName(name),tok:t,seen:now};room.v++;return {seat:i,tok:t};}
+  const t=rndToken(rnd);room.seats[i]=Object.assign({k:'h',nm:cleanName(name),tok:t,seen:now},ac?{ac}:{});room.v++;
+  // a full open table does not wait any longer
+  if(room.q&&!room.seats.some(s=>s.k==='o'))room.qAt=Math.min(room.qAt,now+1500);
+  return {seat:i,tok:t};}
 
 // host changes the table before the start: options, or a seat between "open" and "bot"
 function configure(room,tok,ch){
+  if(room.q)return 'quick';
   if(seatOf(room,tok)!==room.host||room.st==='play')return 'not host';
   if(ch.opts){const o=sanitizeOpts(Object.assign({},room.opts,ch.opts));
     const hs=room.seats.filter(s=>s.k==='h');if(o.n<hs.length)o.n=hs.length;
@@ -414,9 +420,11 @@ function configure(room,tok,ch){
   room.v++;return null;}
 
 function start(room,tok,now,rnd){
-  if(seatOf(room,tok)!==room.host)return 'not host';if(room.st==='play')return 'already';
+  if(room.q&&tok!==null)return 'quick'; // open tables start by themselves
+  if(!room.q&&seatOf(room,tok)!==room.host)return 'not host';if(room.st==='play')return 'already';
   const used=new Set();
   room.seats.forEach((s,i)=>{if(s.k==='h'){s.away=false;s.idle=false;s.to=0;return;}
+    if(room.q)s.ch=null;
     let ch=s.ch&&!used.has(s.ch)?s.ch:null;
     if(!ch){const pool=BOT_CHARS.filter(c=>!used.has(c));ch=pool[Math.floor(rnd()*pool.length)];}
     used.add(ch);room.seats[i]={k:'b',ch};});
@@ -502,7 +510,12 @@ function botMove(room,g,p){
   const m=aiMove(g,p,st)||g.legal(p).find(x=>x.t==='take'||x.t==='done');
   return {t:m.t,c:m.c?m.c.id:undefined,i:m.i};}
 // let bots and timers do what is due; called on every request. Returns true if anything moved.
-function advance(room,now){
+function advance(room,now,rnd){
+  // an open table starts when it is full or has waited long enough; one that everybody left closes
+  if(room.q&&room.st==='lobby'){
+    if(!room.seats.some(s=>s.k==='h')){room.st='closed';room.v++;return true;}
+    if(now>=room.qAt){start(room,null,now,rnd||Math.random);return true;}
+    return false;}
   if(room.st!=='play')return false;let moved=false;
   // players silent for a long time are looked after by a bot until they come back
   for(const s of room.seats)if(s.k==='h'&&!s.away&&now-(s.seen||0)>45000){s.away=true;room.v++;moved=true;}
@@ -521,6 +534,7 @@ function advance(room,now){
   return moved;}
 // the earliest moment the server has something to do by itself (for the push transport)
 function nextDue(room){
+  if(room.q&&room.st==='lobby')return room.qAt;
   if(room.st!=='play')return 0;const {g}=build(room);if(g.over)return 0;const tm=g.toMove();
   return controlled(room,tm)?room.at+botDelay(room,g,tm):room.dl;}
 
@@ -548,7 +562,7 @@ function snapshotFor(room,g,s){
     over:g.over,fool:g.fool,pogony:g.pogony,loserTeam:g.loserTeam==null?null:g.loserTeam,cheat:g.table.map(x=>x.cheat!=null?x.cheat:-1),
     chest:room.chest>=0&&room.chest<g.deck.length?room.chest:-1,logLen:room.log.length};}
 function lobbyFor(room,s){
-  return {code:room.code,v:room.v,st:room.st,game:room.game,host:room.host,me:s,opts:room.opts,dl:room.dl,
+  return {code:room.code,v:room.v,st:room.st,game:room.game,host:room.host,me:s,opts:room.opts,dl:room.dl,q:room.q||undefined,qAt:room.q?room.qAt:undefined,
     seats:room.seats.map((x,i)=>({k:x.k,nm:x.k==='h'?x.nm:undefined,ch:x.ch,away:!!(x.away||x.idle),on:x.k==='h'&&!x.away})),
     fin:room.fin};}
 // everything a client needs after `since` (log index) and `cs` (chat index); since<0 asks for a snapshot
@@ -571,16 +585,80 @@ function leave(room,tok,now){const p=seatOf(room,tok);if(p<0)return 'not seated'
 
 
 ;
+// Open tables for anyone: tables by stake, payouts from the pot, rating and the weekly table.
+// Coins stay with the player (in the platform's save); the server says who won how much and keeps the rating.
+
+const QUICK_WAIT=12000; // a table waits this long for people, then bots take the free seats
+const RAKE=0.10;        // the table keeps a tenth of the pot, so coins do not pile up forever
+const TIERS=[
+  {id:'fair', nm:'Ярмарка',    stake:100,   need:0,    level:'easy',   mult:1},
+  {id:'merch',nm:'Купеческий', stake:1000,  need:300,  level:'medium', mult:1.5},
+  {id:'boyar',nm:'Боярский',   stake:10000, need:1000, level:'hard',   mult:2},
+  {id:'tsar', nm:'Царский',    stake:50000, need:2500, level:'hard',   mult:3}];
+const TITLES=[[0,'Новичок'],[300,'Купец'],[1000,'Боярин'],[2500,'Царь']];
+const PLACE_PTS={2:[20],3:[20,8],4:[20,10,5]},FOOL_PTS=-12,DRAW_PTS=3;
+const SHARE={2:[1],3:[.6,.4],4:[.5,.3,.2]};
+
+function tierOf(id){return TIERS.find(t=>t.id===id)||null;}
+function rankOf(r){let x=TITLES[0];for(const k of TITLES)if(r>=k[0])x=k;return x[1];}
+function nextRank(r){for(const k of TITLES)if(r<k[0])return {at:k[0],nm:k[1]};return null;}
+function weekOf(now){return Math.floor((now+3*3600e3-4*86400e3)/604800e3);} // weeks start on Monday, Moscow time
+function quickKey(tier,mode,n){return tier+'|'+mode+'|'+n;}
+function quickOpts(t,mode,n){return {deck:36,n:Math.max(2,Math.min(4,+n||2)),mode:mode==='perevodnoy'?'perevodnoy':'podkidnoy',rules:{},timer:30,level:t.level};}
+
+// who gets what when a quick game ends: only the fool loses the stake; the others get it back plus a share of the rest
+function quickResult(room,fin){
+  const n=room.seats.length,S=room.q.stake,t=tierOf(room.q.tier)||TIERS[0];
+  const pay=Array(n).fill(0),pts=Array(n).fill(0),place=Array(n).fill(-1);
+  if(fin.fool<0){for(let i=0;i<n;i++){pay[i]=S;pts[i]=DRAW_PTS;}return {pay,pts,place};}
+  const order=fin.out.filter(p=>p!==fin.fool);for(let i=0;i<n;i++)if(i!==fin.fool&&!order.includes(i))order.push(i);
+  const extra=Math.floor(n*S*(1-RAKE))-(n-1)*S,w=SHARE[n]||SHARE[4];
+  order.forEach((p,k)=>{place[p]=k;pay[p]=S+Math.floor(extra*(w[k]||0));pts[p]=Math.round(((PLACE_PTS[n]||PLACE_PTS[4])[k]||0)*t.mult);});
+  place[fin.fool]=n-1;pts[fin.fool]=Math.round(FOOL_PTS*t.mult);
+  return {pay,pts,place};}
+
+/* ---------- accounts: a private id the game makes up for itself, kept by the player ---------- */
+function cleanAcct(a){a=String(a||'');return /^[a-z0-9]{16,40}$/.test(a)?a:'';}
+function accGet(store,a,now){let x=store.acc.get(a);if(!x){x={nm:'Игрок',r:0,g:0,w:0,wk:weekOf(now),wp:0,t:now};}
+  if(x.wk!==weekOf(now)){x.wk=weekOf(now);x.wp=0;}return x;}
+function accPut(store,a,x){store.acc.set(a,x);if(store.accDirty)store.accDirty();}
+function profile(x){const nx=nextRank(x.r);return {r:x.r,rank:rankOf(x.r),next:nx,g:x.g,w:x.w,wp:x.wp};}
+// applied once per finished quick game
+function rateQuick(store,room,now){
+  if(!room.q||!room.fin||room.fin.rated)return false;
+  const res=quickResult(room,room.fin);room.fin.pay=res.pay;room.fin.pts=res.pts;room.fin.place=res.place;room.fin.rated=1;
+  room.seats.forEach((s,i)=>{if(s.k!=='h'||!s.ac)return;const x=accGet(store,s.ac,now);
+    x.r=Math.max(0,x.r+res.pts[i]);x.g++;if(res.place[i]>=0&&i!==room.fin.fool)x.w++;x.wp+=Math.max(0,res.pts[i]);x.nm=s.nm;x.t=now;accPut(store,s.ac,x);});
+  room.v++;return true;}
+function topLists(store,now,me){
+  const wk=weekOf(now),all=[...store.acc.entries()].filter(([,x])=>x.g>0);
+  const week=all.filter(([,x])=>x.wk===wk&&x.wp>0).sort((a,b)=>b[1].wp-a[1].wp);
+  const ever=all.slice().sort((a,b)=>b[1].r-a[1].r);
+  const row=([a,x])=>({nm:x.nm,r:x.r,wp:x.wp,rank:rankOf(x.r),me:a===me||undefined});
+  return {week:week.slice(0,20).map(row),ever:ever.slice(0,20).map(row),
+    myWeek:me?week.findIndex(([a])=>a===me)+1:0,myEver:me?ever.findIndex(([a])=>a===me)+1:0};}
+
+
+;
 // Request handling for the friends' table, independent of where rooms are stored and how messages travel.
 // store: {load(code) -> {room,ver}|null, save(room,ver) -> bool (false if someone changed it meanwhile), create(room) -> bool}
 // Every change is: load, change, save-if-unchanged; on a clash the whole step is simply repeated.
 
 function rndSecure(){try{const b=require('crypto').randomBytes(4);return b.readUInt32LE(0)/4294967296;}catch(e){return Math.random();}}
-const OPS=new Set(['create','join','poll','act','cfg','start','say','leave','tick']);
+const OPS=new Set(['create','join','poll','act','cfg','start','say','leave','tick','quick','me','top']);
+// open tables that still wait for people, by kind (tier|mode|players); only a hint, every table is checked on load
+const OPEN=new Map();
+function openAdd(key,code){if(!OPEN.has(key))OPEN.set(key,[]);OPEN.get(key).push(code);}
+function openDrop(key,code){const a=OPEN.get(key);if(!a)return;const i=a.indexOf(code);if(i>=0)a.splice(i,1);}
 
 async function handle(store,req,now){
   now=now||Date.now();const op=String(req.op||'');
   if(!OPS.has(op))return {err:'bad op'};
+  if(!store.acc)store.acc=new Map();
+  const ac=cleanAcct(req.acct);
+  if(op==='me'){if(!ac)return {err:'bad acct'};const x=accGet(store,ac,now);return {me:profile(x),tiers:TIERS,now};}
+  if(op==='top')return Object.assign(topLists(store,now,ac),{now});
+  if(op==='quick')return quickJoin(store,req,ac,now);
   if(op==='create'){
     for(let k=0;k<8;k++){const r=newRoom(req.opts,req.name,now,rndSecure);
       if(await store.create(r.room))return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now});}
@@ -589,8 +667,9 @@ async function handle(store,req,now){
   for(let attempt=0;attempt<6;attempt++){
     const rec=await store.load(code);if(!rec||rec.room.st==='closed'||rec.room.exp<now)return {err:'no room'};
     const room=rec.room,v0=room.v,l0=room.log.length,c0=room.ci;let err=null,seat=seatOf(room,req.tok),tok=req.tok;
-    if(op==='tick'){advance(room,now);if(room.v!==v0&&!(await store.save(room,rec.ver)))continue;return {room:{code:room.code},due:nextDue(room),_l0:l0,_c0:c0,now};}
-    if(op==='join'){const r=join(room,req.name,now,rndSecure,req.tok);if(r.err)return {err:r.err};seat=r.seat;tok=r.tok;}
+    if(op==='tick'){advance(room,now,rndSecure);rateQuick(store,room,now);if(room.q&&room.st!=='lobby')openDrop(room.q.key,room.code);
+      if(room.v!==v0&&!(await store.save(room,rec.ver)))continue;return {room:{code:room.code},due:nextDue(room),_l0:l0,_c0:c0,now};}
+    if(op==='join'){const r=join(room,req.name,now,rndSecure,req.tok,ac);if(r.err)return {err:r.err};seat=r.seat;tok=r.tok;}
     else{if(seat<0)return {err:'not seated'};const s=room.seats[seat];
       if(now-(s.seen||0)>15000||(s.away&&!s.left)){s.seen=now;s.away=false;room.v++;}}
     if(op==='act')err=act(room,tok,req.m||{},now);
@@ -598,7 +677,7 @@ async function handle(store,req,now){
     else if(op==='start')err=start(room,tok,now,rndSecure);
     else if(op==='say')err=say(room,tok,req.k,now);
     else if(op==='leave')err=leave(room,tok,now);
-    advance(room,now);
+    advance(room,now,rndSecure);rateQuick(store,room,now);if(room.q&&room.st!=='lobby')openDrop(room.q.key,room.code);
     room.exp=now+ROOM_TTL;
     if(room.v!==v0||op==='join'){if(!(await store.save(room,rec.ver)))continue;}
     const since=req.since==null?-1:+req.since;
@@ -609,13 +688,34 @@ async function handle(store,req,now){
     return out;}
   return {err:'busy'};}
 
+// a seat at an open table: the first one of this kind that still waits, or a new one
+async function quickJoin(store,req,ac,now){
+  if(!ac)return {err:'bad acct'};const t=tierOf(req.tier);if(!t)return {err:'bad tier'};
+  const me=accGet(store,ac,now);if(me.r<t.need)return {err:'rank',need:t.need};
+  const o=quickOpts(t,req.mode,req.n),key=quickKey(t.id,o.mode,o.n);me.nm=cleanName(req.name);accPut(store,ac,me);
+  const list=(OPEN.get(key)||[]).slice();
+  for(const code of list){
+    for(let attempt=0;attempt<4;attempt++){const rec=await store.load(code);
+      if(!rec||rec.room.st!=='lobby'||!rec.room.q||rec.room.qAt<now+1500||!rec.room.seats.some(s=>s.k==='o')){openDrop(key,code);break;}
+      const room=rec.room;
+      // the same person twice at one table is not a game
+      if(room.seats.some(s=>s.k==='h'&&s.ac===ac)){openDrop(key,code);break;}
+      const r=join(room,req.name,now,rndSecure,'',ac);if(r.err){openDrop(key,code);break;}
+      room.exp=now+ROOM_TTL;
+      if(!(await store.save(room,rec.ver)))continue;
+      if(!room.seats.some(s=>s.k==='o'))openDrop(key,code);
+      return Object.assign({tok:r.tok,seat:r.seat},viewFor(room,r.seat,-1,0),{now,due:nextDue(room),_l0:0,_c0:0,_changed:true});}}
+  for(let k=0;k<8;k++){const r=newRoom(o,req.name,now,rndSecure,ac,{tier:t.id,stake:t.stake,key});
+    if(await store.create(r.room)){openAdd(key,r.room.code);return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now,due:nextDue(r.room)});}}
+  return {err:'busy'};}
+
 // an in-memory store for local testing
 function memStore(){const m=new Map();
   return {
     async load(code){const s=m.get(code);return s?{room:JSON.parse(s.d),ver:s.ver}:null;},
     async save(room,ver){const s=m.get(room.code);if(!s||s.ver!==ver)return false;m.set(room.code,{d:JSON.stringify(room),ver:ver+1});return true;},
     async create(room){if(m.has(room.code))return false;m.set(room.code,{d:JSON.stringify(room),ver:1});return true;},
-    _m:m};}
+    acc:new Map(),_m:m};}
 
 
 ;
@@ -629,19 +729,40 @@ const core=typeof handle==='function'?{handle,memStore,viewFor}:require('./dist/
 const PORT=+process.env.PORT||8080,DATA=process.env.DATA||'/var/lib/durak/rooms.json',STATIC=process.env.STATIC||'';
 
 /* ---------- rooms: in memory, saved to disk ---------- */
-const store=core.memStore();let dirty=false;
+const store=core.memStore();let dirty=false,accDirty=false;
+const ACC=path.join(path.dirname(DATA),'accounts.json');
+try{store.acc=new Map(JSON.parse(fs.readFileSync(ACC,'utf8')));console.log('loaded accounts',store.acc.size);}catch(e){store.acc=new Map();}
+store.accDirty=()=>{accDirty=true;};
 try{const raw=JSON.parse(fs.readFileSync(DATA,'utf8'));const now=Date.now();
   for(const [code,rec] of raw){const r=JSON.parse(rec.d);if(r.exp>now){r.cx={};rec.d=JSON.stringify(r);store._m.set(code,rec);}}
   console.log('loaded rooms',store._m.size);}catch(e){console.log('no saved rooms');}
 const save0=store.save,create0=store.create;
 store.save=async(r,v)=>{const ok=await save0(r,v);if(ok)dirty=true;return ok;};
 store.create=async r=>{const ok=await create0(r);if(ok)dirty=true;return ok;};
+function persistAcc(){if(!accDirty)return;accDirty=false;
+  try{fs.mkdirSync(path.dirname(ACC),{recursive:true});fs.writeFileSync(ACC+'.tmp',JSON.stringify([...store.acc]));fs.renameSync(ACC+'.tmp',ACC);}catch(e){console.error('acc save failed',e.message);}}
+setInterval(persistAcc,5000);
 function persist(){if(!dirty)return;dirty=false;const now=Date.now();
   for(const [code,rec] of store._m){try{if(JSON.parse(rec.d).exp<now){store._m.delete(code);conns.delete(code);}}catch(e){store._m.delete(code);}}
   try{fs.mkdirSync(path.dirname(DATA),{recursive:true});fs.writeFileSync(DATA+'.tmp',JSON.stringify([...store._m]));fs.renameSync(DATA+'.tmp',DATA);}catch(e){console.error('save failed',e.message);}}
 setInterval(persist,5000);
-process.on('SIGTERM',()=>{dirty=true;persist();process.exit(0);});
-process.on('SIGINT',()=>{dirty=true;persist();process.exit(0);});
+process.on('SIGTERM',()=>{dirty=true;persist();persistAcc();process.exit(0);});
+process.on('SIGINT',()=>{dirty=true;persist();persistAcc();process.exit(0);});
+
+/* ---------- updating itself: a newer server on GitHub is picked up when no game is being played ---------- */
+// the service downloads server.js on every start, so leaving is enough; rooms and accounts are saved first
+const SELF=process.env.SELF_URL||'https://raw.githubusercontent.com/ttgms/durak/main/server/server.js';
+let newerSince=0;
+function busyTables(){let n=0;for(const [,rec] of store._m){try{if(JSON.parse(rec.d).st==='play')n++;}catch(e){}}return n;}
+function checkSelf(){if(process.env.NO_SELF_UPDATE)return;
+  require('https').get(SELF,res=>{if(res.statusCode!==200){res.resume();return;}let b='';res.setEncoding('utf8');res.on('data',d=>b+=d);
+    res.on('end',()=>{let mine='';try{mine=fs.readFileSync(__filename,'utf8');}catch(e){return;}
+      if(!b||b.length<1000||b===mine){newerSince=0;return;}
+      if(!newerSince)newerSince=Date.now();
+      // wait for a quiet moment, but not for ever
+      if(busyTables()===0||Date.now()-newerSince>3*3600e3){console.log('newer server found, restarting');dirty=true;persist();accDirty=true;persistAcc();process.exit(0);}});})
+  .on('error',()=>{});}
+setInterval(checkSelf,5*60*1000);
 
 /* ---------- who is connected to which table ---------- */
 const conns=new Map(); // code -> Set of sockets (sock.seat)

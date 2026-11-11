@@ -1147,9 +1147,9 @@ document.addEventListener('visibilitychange',()=>{if(!ac)return;if(document.hidd
 addEventListener('pageshow',()=>{if(ac&&ac.state!=='running')ac.resume().catch(()=>{});});
 
 /* ---------- navigation ---------- */
-const SCREENS=['home','camp','quick','shop','stats','table','friends','lobby'];
+const SCREENS=['home','camp','quick','shop','stats','table','friends','lobby','arena'];
 function show(id){for(const s of SCREENS)$(s).hidden=s!==id;refreshCoins();fxSync();
-  if(id==='home')renderHome();if(id==='camp')renderCamp();if(id==='quick')renderQuick();if(id==='shop')renderShop();if(id==='stats')renderStats();if(id==='friends')renderFriends();}
+  if(id==='home')renderHome();if(id==='camp')renderCamp();if(id==='quick')renderQuick();if(id==='shop')renderShop();if(id==='stats')renderStats();if(id==='friends')renderFriends();if(id==='arena')renderArena();}
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
 menuFx.attach(document.querySelector('#home .hdeco'));
 function fxSync(){menuFx.set(save.tableSkin);menuFx.run(save.set.fx&&!$('home').hidden);}
@@ -1174,7 +1174,7 @@ function checkAch(){for(const a of newAch()){save.ach[a.id]=Date.now();addCoins(
 /* ---------- home ---------- */
 function renderFan(){setFaceStyle(save.face);$('fan').innerHTML=[['Д','h',-22],['К','s',0],['Т','d',22]].map(([r,su,a],i)=>`<div class="fc" style="transform:rotate(${a}deg);animation-delay:${i*.08}s">${faceSVG({r,s:su})}</div>`).join('');}
 renderFan();$('table').insertAdjacentHTML('afterbegin',TDECO_HTML);
-function renderHome(){const st=starsTotal(),cur=LOCS.findIndex((l,i)=>!locDone(i));
+function renderHome(){if($('hArenaRank'))$('hArenaRank').textContent=save.arenaRank||'';const st=starsTotal(),cur=LOCS.findIndex((l,i)=>!locDone(i));
   $('homeProg').textContent=`Звёзд в походе: ${st} из ${STARS_MAX}`+(cur<0?' · Поход пройден!':` · Сейчас: ${LOCS[cur].name}`);
   renderDaily();checkGift();}
 function renderDaily(){const d=dailyTask(),done=dailyDone(),b=$('hDaily');
@@ -1660,7 +1660,7 @@ function showOver(){
   if(win&&n>=4)s.bigWins++;if(win&&n>=6)s.sixWins++;if(win&&g.deckSize===54)s.win54++;
   const bm=s.byMode[g.mode],bd=s.byDeck[g.deckSize]||(s.byDeck[g.deckSize]={g:0,w:0}),bp=s.byPlayers[n]||(s.byPlayers[n]={g:0,w:0});bm.g++;bd.g++;bp.g++;if(win){bm.w++;bd.w++;bp.w++;}
   // rewards
-  const rw=[];let coins=0,starsShow=null;
+  const rw=[];let coins=0,starsShow=null,noBoost=false;
   if(cfg.kind==='camp'){const L=LOCS[cfg.li],st=L.stages[cfg.si],key=stageKey(L.id,cfg.si),prev=stageRec(L.id,cfg.si);
     const got=st.goals.map(k=>goalMet(k,r)?1:0),stars=prev.stars.map((v,i)=>v||got[i]),newStars=stars.reduce((a,b)=>a+b,0)-prev.stars.reduce((a,b)=>a+b,0);
     if(win)coins+=stageReward(cfg.li,cfg.si,prev);coins+=newStars*10;
@@ -1669,7 +1669,7 @@ function showOver(){
     if(win&&!prev.won){if(L.id==='palace'&&cfg.si===2&&!save.owned.includes('palaty')){save.owned.push('palaty');rw.push('Стол «Царские палаты»');}
       if(L.id==='palace'&&cfg.si===3&&!save.owned.includes('tsar')){save.owned.push('tsar');rw.push('Рубашка «Царская»');}}
     if(starsTotal()>=STARS_MAX&&!save.owned.includes('gold')){save.owned.push('gold');rw.push('Колода «Золотая»');}
-  }else if(NET){const o=netReward(win);coins+=o.coins;rw.push(...o.rw);}
+  }else if(NET){const o=netReward(win);coins+=o.coins;rw.push(...o.rw);if(o.noBoost)noBoost=true;}
   else if(win)coins+=quickReward(n-1,cfg.level)+(r.pogGiven?10:0);
   if(track.chest){coins+=CHEST_COINS;rw.push('Клад +'+CHEST_COINS);}
   if(track.caught){coins+=track.caught*10;rw.push('Пойман шулер ×'+track.caught+': +'+track.caught*10);}
@@ -1678,9 +1678,9 @@ function showOver(){
       s.dailyCount=(s.dailyCount||0)+1;if(s.dailyCount>=7&&!save.owned.includes('morozko')){save.owned.push('morozko');rw.push('Стол «Морозко»');}}
     else if(!dailyDone())rw.push('Задание дня не выполнено — попробуйте ещё');}
   else if(draw)coins+=5;
-  if(coins&&win&&save.iap&&save.iap.boyar){coins*=2;rw.push('Боярский пакет: монеты ×2');}
+  if(coins&&win&&!noBoost&&save.iap&&save.iap.boyar){coins*=2;rw.push('Боярский пакет: монеты ×2');}
   if(coins){addCoins(coins);rw.unshift('+'+coins+' монет');}
-  lastWin=win?coins:0;
+  lastWin=win&&!noBoost?coins:0; // a payout from a stake is not doubled for an ad
   persist();
   // texts
   let t,m;const foolName=fool>0?CHR(seatChar[fool]).name:'';
@@ -1815,11 +1815,12 @@ function netTick(){
   const every=!net.wsOk?(r&&r.st==='lobby'?1500:1000):20000;
   if(!net.busy&&(now-net.lastPoll>every||(overdue&&now-net.lastPoll>2500)||(net.wsOk&&r&&r.st==='play'&&!mine&&now-net.lastIn>6000&&now-net.lastPoll>3000))){
     net.busy=true;net.lastPoll=now;netCall('poll').then(()=>{net.busy=false;},()=>{net.busy=false;});}
-  netTimer();}
+  netTimer();
+  if(net.room&&net.room.q&&net.room.st==='lobby'&&!$('lobby').hidden)lobbyCountdown();}
 
 /* ---------- the game: follow the server's log on our copy of the table ---------- */
 function netStartGame(snap,quiet){
-  NET=true;net.game=net.room.game;net.q=[];net.wait=false;
+  NET=true;net.game=net.room.game;net.q=[];net.wait=false;quickPayStake();
   net.m=new Mirror(snap,net.room.me,{reveal:netReveal});net.have=snap.logLen;net.pend=[];
   const o=net.room.opts,fresh=snap.logLen===0&&!snap.over;
   startGame({kind:'online',mirror:net.m,fresh:fresh&&!quiet,mode:o.mode,deck:o.deck,level:o.level,rules:Object.assign({},o.rules,{timer:false}),skin:save.tableSkin,goals:null,opps:[]});
@@ -1866,21 +1867,27 @@ function refreshNetSeats(){if(!NET||!g||!net.room)return;
 function netSay(c){const q=net.room?(c.p-net.room.me+net.room.seats.length)%net.room.seats.length:-1,t=PHRASES[c.k]||'';
   if(!t)return;if(NET&&g){if(q===0)gToast(t);else say(q,t);}
   else{const el=$('lChat');if(el){const s=net.room.seats[c.p];el.textContent=(s&&s.nm?s.nm:'Игрок')+': '+t;el.classList.remove('on');void el.offsetWidth;el.classList.add('on');}}}
-function netReward(win){const o={coins:0,rw:[]};if(!win)return o;
+function netReward(win){const o={coins:0,rw:[]};
+  if(net.room.q)return quickReward2(o,win);
+  if(!win)return o;
   const people=net.room.seats.filter(x=>x.k==='h').length;
   if(people>=2){const d=dayKey();if(!save.netDay||save.netDay.d!==d)save.netDay={d,w:0};
     if(save.netDay.w<5){save.netDay.w++;o.coins+=30;}else o.rw.push('Монеты за победы над друзьями — до 5 раз в день');
     if(!save.owned.includes('skaz')){save.owned.push('skaz');o.rw.push('Колода «Сказочная»');}}
   else o.coins+=quickReward(g.n-1,net.room.opts.level);
   return o;}
-function netOverButtons(main,alt){const host=net.room.host===net.room.me;
+function netOverButtons(main,alt){
+  if(net.room.q){const tier=net.room.q.tier;main.textContent='Ещё партию';main.disabled=false;
+    main.onclick=()=>{modal('over',false);netLeave('arena');arenaPlay(tier);};
+    alt.textContent='К столам';alt.onclick=()=>{modal('over',false);netLeave('arena');};return;}
+  const host=net.room.host===net.room.me;
   if(host){main.textContent='Ещё партию';main.disabled=false;main.onclick=()=>{main.disabled=true;netCall('start');};}
   else{main.textContent='Ждём хозяина стола…';main.disabled=true;}
   alt.textContent='Выйти из-за стола';alt.onclick=()=>{modal('over',false);netLeave();};}
-function netLeave(){if(NET&&counts())recordLoss({mode:g.mode,deck:g.deckSize,n:g.n});const code=net.code;if(code)netReq('leave');netStopLoop();
+function netLeave(to){const quick=!!(net.room&&net.room.q);if(NET&&counts())recordLoss({mode:g.mode,deck:g.deckSize,n:g.n});const code=net.code;if(code)netReq('leave');netStopLoop();
   NET=false;net.m=null;net.code='';net.room=null;net.q=[];save.net=Object.assign(save.net||{},{code:'',tok:''});persist();
-  $('chatBtn').hidden=true;$('chatP').hidden=true;clearAll();modal('over',false);show('friends');}
-function netGone(msg){netStopLoop();NET=false;net.m=null;net.code='';net.room=null;save.net=Object.assign(save.net||{},{code:'',tok:''});persist();
+  $('chatBtn').hidden=true;$('chatP').hidden=true;clearAll();modal('over',false);show(typeof to==='string'?to:quick?'arena':'friends');}
+function netGone(msg){const quick=!!(net.room&&net.room.q);if(quick){netLeave('arena');$('aMsg').textContent=msg;return;}netStopLoop();NET=false;net.m=null;net.code='';net.room=null;save.net=Object.assign(save.net||{},{code:'',tok:''});persist();
   $('chatBtn').hidden=true;$('chatP').hidden=true;clearAll();modal('over',false);modal('pause',false);show('friends');$('fMsg').textContent=msg;}
 
 /* ---------- phrases ---------- */
@@ -1909,6 +1916,7 @@ $('fJoin').onclick=()=>{audio();const code=$('fCode').value.trim();if(!code){$('
 $('fCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('fJoin').click();});
 $('fBack').onclick=()=>{audio();$('fMsg').textContent='Подключаемся…';netReq('join',{code:save.net.code,name:myName(),tok:save.net.tok}).then(v=>{if(v&&v.err){save.net.code='';save.net.tok='';persist();renderFriends();}netEnter(v);});};
 $('lLeave').onclick=()=>netLeave();
+$('hArena').onclick=()=>{audio();show('arena');};
 // a platform may have its own link to the game (and its own way to share it)
 function shareLink(){const P=window.__PF;return P&&P.shareLink?P.shareLink(net.code):NET_SHARE+'?t='+encodeURIComponent(net.code);}
 $('lShare').onclick=()=>{const url=shareLink(),text='Садись со мной за стол в «Дурака»! Код стола: '+net.code;
@@ -1923,6 +1931,13 @@ const LEVEL_NAME={easy:'лёгкие',medium:'средние',hard:'сильны
 function cfgSend(ch){netCall('cfg',{ch});}
 function renderLobby(){
   if($('lobby').hidden)show('lobby');
+  const quick=!!net.room.q;$('lShareRow').hidden=quick;$('lCode').classList.toggle('wait',quick);
+  if(quick){const r=net.room,t=arenaTier(r.q.tier);
+    $('lCodeL').textContent=`Стол «${t.nm}» · ставка ${fmtNum(r.q.stake)}`;lobbyCountdown();
+    const open=r.seats.filter(x=>x.k==='o').length;$('lSub').textContent=`${MODE_NAME[r.opts.mode]}, ${plural(r.seats.length,'игрок','игрока','игроков')}`+(open?` · свободно ${open}`:'');
+    $('lSeats').innerHTML=r.seats.map((x,i)=>`<div class="lseat">${x.k==='h'?`<span class="pic">${avatarSVG(x.nm,i)}</span><b>${esc(x.nm)}</b>${i===r.me?'<em>вы</em>':''}`:`<span class="pic free">+</span><b class="dim">Ждём игрока…</b>`}</div>`).join('');
+    $('lOpts').innerHTML='';$('lStart').hidden=true;$('lWait').textContent='Если никто не придёт, свободные места займут боты.';return;}
+  $('lCodeL').textContent='Код стола';
   const r=net.room,host=r.host===r.me,o=r.opts,maxN={24:4,36:5,52:6,54:6}[o.deck];
   $('lCode').textContent=r.code;
   const ppl=r.seats.filter(x=>x.k==='h').length,open=r.seats.filter(x=>x.k==='o').length;
@@ -1956,6 +1971,85 @@ function renderLobby(){
 $('lStart').onclick=()=>{audio();netCall('start');};
 // a link with ?t=CODE opens the friends' screen ready to join
 (function(){try{const t=new URLSearchParams(location.search).get('t')||(window.__PF&&window.__PF.startCode);if(t){$('fCode').value=t;show('friends');renderFriends();$('fMsg').textContent='Введите имя и нажмите «Войти».';}}catch(e){}})();
+
+/* ---------- open tables: stakes, rating, the weekly table ---------- */
+// the game's own private id for this player; it lives in the save, so it follows the player wherever the save goes
+function myAcct(){if(!save.acct){let a='';try{const b=new Uint8Array(16);crypto.getRandomValues(b);b.forEach(x=>a+='abcdefghijkmnpqrstuvwxyz23456789'[x&31]);}catch(e){for(let i=0;i<20;i++)a+='abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random()*32)];}
+  save.acct=a+'x'.repeat(Math.max(0,16-a.length));persist();}return save.acct;}
+const ARENA_TIERS=[{id:'fair',nm:'Ярмарка',stake:100,need:0},{id:'merch',nm:'Купеческий',stake:1000,need:300},{id:'boyar',nm:'Боярский',stake:10000,need:1000},{id:'tsar',nm:'Царский',stake:50000,need:2500}];
+const ARENA_TITLES=[[0,'Новичок'],[300,'Купец'],[1000,'Боярин'],[2500,'Царь']];
+const BAIL=500;
+let arenaMe=null;
+if(!save.arena)save.arena={mode:'podkidnoy',n:2};if(!save.qPaid)save.qPaid={};if(!save.qDone)save.qDone={};
+const fmtNum=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+function arenaTier(id){return ARENA_TIERS.find(t=>t.id===id)||ARENA_TIERS[0];}
+function titleOf(r){let x=ARENA_TITLES[0];for(const k of ARENA_TITLES)if(r>=k[0])x=k;return x[1];}
+// what the best place brings at this table: the stake back plus the biggest share of the rest
+function bestWin(S,n){const extra=Math.floor(n*S*.9)-(n-1)*S;return Math.floor(extra*({2:1,3:.6,4:.5}[n]||.5));}
+function renderArena(){
+  $('aName').value=save.net.name||(window.__PF&&window.__PF.userName)||'';
+  segButtons($('aMode'),[['podkidnoy','Подкидной'],['perevodnoy','Переводной']],save.arena.mode,v=>{save.arena.mode=v;persist();renderArena();});
+  segButtons($('aN'),[[2,'2'],[3,'3'],[4,'4']],save.arena.n,v=>{save.arena.n=v;persist();renderArena();});
+  renderArenaMe();
+  const r=arenaMe?arenaMe.r:0,n=save.arena.n;
+  $('aTiers').innerHTML=ARENA_TIERS.map(t=>{const lock=r<t.need;
+    return `<div class="panel tier${lock?' lock':''}"><h4>${t.nm}</h4><span class="st">Ставка <b>${fmtNum(t.stake)}</b></span><span class="st">Победа: <b>+${fmtNum(bestWin(t.stake,n))}</b></span>
+      ${lock?`<span class="lk">🔒 Со звания «${titleOf(t.need)}»</span>`:`<button class="gold" type="button" data-t="${t.id}">Играть</button>`}</div>`;}).join('');
+  $('aTiers').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{audio();arenaPlay(b.dataset.t);});
+  if(!NET_API){$('aMsg').textContent='Онлайн-столы скоро заработают.';return;}
+  netReq('me',{acct:myAcct()}).then(v=>{if(v&&v.me){arenaMe=v.me;save.arenaRank=v.me.rank;persist();if(!$('arena').hidden){renderArenaMe();
+    $('aTiers').querySelectorAll('.tier').forEach((el,i)=>{const t=ARENA_TIERS[i];if(el.classList.contains('lock')!==(arenaMe.r<t.need))renderArena();});}}});}
+function renderArenaMe(){const m=arenaMe||{r:0,rank:'Новичок',next:{at:300,nm:'Купец'},wp:0};
+  $('aRank').textContent=m.rank;$('aPts').textContent=fmtNum(m.r);
+  const prev=[...ARENA_TITLES].reverse().find(k=>m.r>=k[0])[0];
+  $('aBar').style.width=(m.next?Math.min(100,Math.round((m.r-prev)/(m.next.at-prev)*100)):100)+'%';
+  $('aNext').textContent=m.next?`До звания «${m.next.nm}»: ${fmtNum(m.next.at-m.r)}`:'Высшее звание';}
+function arenaName(){const v=$('aName').value.replace(/[<>&"'`\\]/g,'').trim().slice(0,14);if(v!==save.net.name){save.net.name=v;persist();}return v||'Игрок';}
+function arenaPlay(tier){const t=arenaTier(tier);const msg=$('aMsg');msg.textContent='';
+  if(!NET_API){msg.textContent='Онлайн-столы скоро заработают.';return;}
+  if(save.coins<t.stake){
+    const d=dayKey(),canBail=save.coins<ARENA_TIERS[0].stake&&(!save.bail||save.bail!==d);
+    if(canBail){msg.innerHTML=`Монеты закончились. <button class="plain sm" type="button" id="aBail">Взять ${BAIL} на игру</button>`;
+      $('aBail').onclick=()=>{save.bail=d;addCoins(BAIL);coinSnd();msg.textContent=`+${BAIL} монет — удачи за столом!`;};}
+    else{msg.innerHTML=`Для этого стола нужно ${fmtNum(t.stake)} монет.`+(window.__PF&&window.__PF.store?' <button class="plain sm" type="button" id="aBuy">В казну</button>':' Сыграйте за столом попроще.');
+      const b=$('aBuy');if(b)b.onclick=()=>{shopTab='iap';show('shop');};}
+    return;}
+  if(!$('arena').hidden)msg.textContent='Ищем стол…';
+  netReq('quick',{acct:myAcct(),name:arenaName(),tier:t.id,mode:save.arena.mode,n:save.arena.n}).then(v=>{
+    if(!v||v.err||!v.room){show('arena');$('aMsg').textContent=v&&v.err==='rank'?'Этот стол откроется с новым званием.':'Не получилось связаться с сервером. Попробуйте ещё раз.';return;}
+    net.code=v.room.code;net.tok=v.tok;net.room=v.room;net.cs=0;net.m=null;net.have=0;
+    $('aMsg').textContent='';netConnect();netOn(v,-1);});}
+function lobbyCountdown(){const r=net.room;if(!r||!r.qAt)return;const left=Math.max(0,Math.ceil((r.qAt-(Date.now()+net.skew))/1000));
+  $('lCode').textContent=left>0?`Ищем соперников… 0:${String(left).padStart(2,'0')}`:'Садимся за стол…';}
+function quickKeyOf(){return net.room.code+':'+net.room.game;}
+function trimKeys(o){const k=Object.keys(o);if(k.length>40)for(const x of k.slice(0,k.length-40))delete o[x];}
+function quickPayStake(){const r=net.room;if(!r||!r.q)return;const k=quickKeyOf();if(save.qPaid[k])return;
+  const st=Math.min(r.q.stake,save.coins);save.qPaid[k]=st||1;trimKeys(save.qPaid);addCoins(-st);gToast(`Ставка ${fmtNum(r.q.stake)} в банке`);}
+// what the finished game brought: the payout and the rating points come from the server
+function quickReward2(o,win){const r=net.room,k=quickKeyOf();o.noBoost=true;
+  if(!r.fin||!r.fin.pay){o.rw.push('Подсчитываем банк…');pendingPay=k;return o;}
+  if(save.qDone[k])return o;save.qDone[k]=1;trimKeys(save.qDone);
+  const pay=r.fin.pay[r.me]||0,pts=(r.fin.pts||[])[r.me]||0;o.coins=pay;
+  if(!pay)o.rw.push(`Ставка ${fmtNum(r.q.stake)} проиграна`);
+  if(pts)o.rw.push(`Рейтинг ${pts>0?'+':''}${pts}`);
+  if(win&&!save.owned.includes('skaz')){save.owned.push('skaz');o.rw.push('Колода «Сказочная»');}
+  return o;}
+let pendingPay='';
+// the payout came a moment after the game was shown as over
+setInterval(()=>{if(!pendingPay||!net.room||!net.room.q)return;const r=net.room;if(quickKeyOf()!==pendingPay||!r.fin||!r.fin.pay){if(r.fin&&!r.fin.pay&&net.code)netCall('poll');return;}
+  pendingPay='';const o=quickReward2({coins:0,rw:[]},r.fin.fool!==r.me);if(o.coins){addCoins(o.coins);gToast('+'+fmtNum(o.coins)+' монет');}},1500);
+/* the weekly table */
+let topTab='week';
+$('aMe').onclick=()=>{audio();openTop();};
+$('aName').addEventListener('input',()=>arenaName());
+$('topDone').onclick=()=>modal('topM',false);
+function openTop(){modal('topM',true);$('topList').innerHTML='<div class="empty">Загружаем…</div>';$('topMe').textContent='';
+  netReq('top',{acct:myAcct()}).then(v=>{if(!v||v.err||!v.week){$('topList').innerHTML='<div class="empty">Не получилось загрузить рейтинг.</div>';return;}renderTop(v);});}
+function renderTop(v){segButtons($('topTabs'),[['week','Неделя'],['ever','Всё время']],topTab,x=>{topTab=x;renderTop(v);});
+  const list=v[topTab],key=topTab==='week'?'wp':'r';
+  $('topList').innerHTML=list.length?list.map((x,i)=>`<div class="${x.me?'me':''}"><span class="n">${i+1}</span><span>${esc(x.nm)} <small>${x.rank}</small></span><b>${fmtNum(x[key])}</b></div>`).join(''):'<div class="empty">Пока никого. Сыграйте первым!</div>';
+  const place=topTab==='week'?v.myWeek:v.myEver;
+  $('topMe').textContent=place?`Ваше место: ${place}`:topTab==='week'?'Победите за онлайн-столом, чтобы попасть в рейтинг недели.':'Сыграйте за онлайн-столом, чтобы попасть в рейтинг.';}
 
 /* ---------- shop for real money and ads for rewards (only where the platform offers them: Pikabu) ---------- */
 // window.__PF is set by the platform page before the game starts; the plain site has none, and all of this stays hidden.

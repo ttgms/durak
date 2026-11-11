@@ -62,6 +62,22 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .fmsg{min-height:1.2em;margin:0;color:#ffd88a;font-size:14px;text-align:center}
 .hint{font-size:13px;color:var(--muted);text-align:center;max-width:44ch;margin:0}
 .lcode{font-size:40px;letter-spacing:.08em;margin:0}
+.lcode.wait{font-size:26px;letter-spacing:0}
+#home nav .arena.mtile{background:linear-gradient(#b8452f,#8c2a1d);box-shadow:inset 0 1px 0 rgba(255,210,170,.3),inset 0 0 0 3px rgba(0,0,0,.12),0 4px 0 #4a120b,0 8px 16px rgba(0,0,0,.35)}
+#home nav .arena .live{font:600 11px var(--ui);background:rgba(255,255,255,.18);padding:3px 8px;border-radius:999px;margin-left:4px}
+#home nav .arena .live:empty{display:none}
+.ame{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;width:min(420px,100%);padding:14px 16px;border:0;cursor:pointer;text-align:left;font:inherit}
+.ame .arank{font:400 24px var(--display);color:var(--paper-ink)}.ame .apts{justify-self:end;font-size:13px;color:var(--paper-muted)}.ame .apts b{color:var(--paper-ink);font-size:16px}
+.ame .abar{grid-column:1/-1;height:8px;border-radius:999px;background:#e3d6bd;overflow:hidden}.ame .abar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#e6a828,#c97a12);border-radius:999px}
+.ame .anext{font-size:12px;color:var(--paper-muted)}.ame .atop{justify-self:end;font-size:13px;font-weight:700;color:#a8541c}
+#aTiers{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:min(420px,100%)}
+.tier{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 10px;text-align:center}
+.tier h4{margin:0;font:400 20px var(--display)}.tier .st{font-size:13px;color:var(--paper-muted)}.tier .st b{color:var(--paper-ink)}
+.tier .gold{margin-top:6px;padding:9px 16px;font-size:15px}.tier.lock{opacity:.72}.tier .lk{font-size:12px;color:#a8541c;margin-top:6px}
+.toplist{display:flex;flex-direction:column;gap:4px;margin:12px 0;text-align:left;max-height:50vh;overflow-y:auto}
+.toplist div{display:grid;grid-template-columns:2em 1fr auto;gap:8px;align-items:center;padding:7px 10px;border-radius:10px;background:var(--paper2);font-size:14px}
+.toplist div.me{background:#f6e2a8;font-weight:700}.toplist small{color:var(--paper-muted);font-weight:400}.toplist .n{color:var(--paper-muted)}
+.toplist .empty{display:block;text-align:center;color:var(--paper-muted);background:none}
 .lrow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 #lSeats{display:flex;flex-direction:column;gap:8px;width:min(420px,100%)}
 .lseat{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:14px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.12);min-height:52px}
@@ -362,6 +378,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   <header class="title"><h1 class="h1">Дурак</h1><p class="ribbon">Царский турнир</p></header>
   <nav>
     <button id="hCamp" class="gold wide" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19l5-2 6 2 5-2V5l-5 2-6-2-5 2z"/><path d="M9 5v12M15 7v12"/></svg>Царский путь</button>
+    <button id="hArena" class="mtile wide arena" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.3 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.3-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg>Онлайн-столы<span class="live" id="hArenaRank"></span></button>
     <button id="hQuick" class="mtile blue" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="9" height="13" rx="2"/><path d="M13 8l5 1.3-2.6 10-3.4-.9"/></svg>Быстрая игра</button>
     <button id="hFriends" class="mtile blue" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8.5" cy="9" r="3"/><circle cx="16" cy="10" r="2.5"/><path d="M3 19c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5M14 15.2c.6-.3 1.3-.4 2-.4 2.2 0 3.9 1.3 4.4 4.2"/></svg>С друзьями</button>
     <button id="hShop" class="mtile" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16l-1.5 10h-13z"/><path d="M8 9a4 4 0 0 1 8 0"/></svg>Лавка</button>
@@ -424,11 +441,25 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   </div>
 </div>
 
+<div id="arena" class="screen mscreen" hidden>
+  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><span class="coins"><span class="coin">₽</span><span class="coinVal">0</span></span></div>
+  <header><h2 class="h2">Онлайн-столы</h2><p class="sub">Игроки со всей страны, пустые места займут боты</p></header>
+  <div class="opts">
+    <button id="aMe" class="panel ame" type="button"><span class="arank" id="aRank">Новичок</span><span class="apts"><b id="aPts">0</b> очков рейтинга</span><span class="abar"><i id="aBar"></i></span><span class="anext" id="aNext"></span><span class="atop">Рейтинг недели ›</span></button>
+    <div class="opt"><span class="lbl">Ваше имя</span><input id="aName" class="tin" maxlength="14" autocomplete="nickname" placeholder="Как вас зовут?"></div>
+    <div class="opt"><span class="lbl">Правила</span><div class="seg" id="aMode"></div></div>
+    <div class="opt"><span class="lbl">Игроков за столом</span><div class="seg" id="aN"></div></div>
+    <div id="aTiers"></div>
+    <p id="aMsg" class="fmsg" aria-live="polite"></p>
+    <p class="hint">Ставка списывается, когда партия начинается. Проигрывает ставку только дурак, остальные получают её обратно и делят выигрыш. Стол берёт десятую часть банка.</p>
+  </div>
+</div>
+
 <div id="lobby" class="screen mscreen" hidden>
   <div class="topbar"><button id="lLeave" class="ghost back" type="button">← Выйти</button><button id="lChatBtn" class="ghost" type="button" aria-label="Фразы">💬</button></div>
   <div id="lChatP" class="phrases" hidden></div>
-  <header><p class="sub">Код стола</p><h2 class="h2 lcode" id="lCode"></h2><p class="sub" id="lSub"></p></header>
-  <div class="row lrow"><button id="lShare" class="gold" type="button">Позвать друзей</button><button id="lCopy" class="plain" type="button">Скопировать ссылку</button></div>
+  <header><p class="sub" id="lCodeL">Код стола</p><h2 class="h2 lcode" id="lCode"></h2><p class="sub" id="lSub"></p></header>
+  <div class="row lrow" id="lShareRow"><button id="lShare" class="gold" type="button">Позвать друзей</button><button id="lCopy" class="plain" type="button">Скопировать ссылку</button></div>
   <div id="lSeats"></div>
   <div class="opts" id="lOpts"></div>
   <button id="lStart" class="gold" type="button">Начать игру</button>
@@ -497,6 +528,14 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   <div class="row"><button id="giftTake" class="gold" type="button">Забрать</button><button id="giftAd" class="plain adbtn" type="button" hidden>📺 Удвоить за рекламу</button></div>
 </div></div>
 
+<div id="topM" class="modal" hidden><div class="p">
+  <h2>Рейтинг</h2>
+  <div class="seg" id="topTabs"></div>
+  <div id="topList" class="toplist"></div>
+  <p id="topMe"></p>
+  <div class="row"><button id="topDone" class="gold" type="button">Закрыть</button></div>
+</div></div>
+
 <div id="settings" class="modal" hidden><div class="p">
   <h2>Настройки</h2>
   <div id="setRows"></div>
@@ -526,7 +565,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   function log(){try{console.log('[pkb]',[].slice.call(arguments).join(' '));}catch(e){}}
   var started=false;
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794410237';s.onload=function(){};document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794416611';s.onload=function(){};document.body.appendChild(s);}
   // with no SDK (opened outside Pikabu, or it failed) the game still starts, just without the shop and ads
   var fallback=setTimeout(function(){log('sdk timeout');boot(null);},10000);
   var VERIFY='https://functions.yandexcloud.net/d4ek5krq1hev1t9fthbl';
