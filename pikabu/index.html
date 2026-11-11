@@ -565,29 +565,27 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   function log(){try{console.log('[pkb]',[].slice.call(arguments).join(' '));}catch(e){}}
   var started=false;
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794416611';s.onload=function(){};document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794426415';s.onload=function(){};document.body.appendChild(s);}
   // with no SDK (opened outside Pikabu, or it failed) the game still starts, just without the shop and ads
   var fallback=setTimeout(function(){log('sdk timeout');boot(null);},10000);
-  var VERIFY='https://functions.yandexcloud.net/d4ek5krq1hev1t9fthbl';
-  function verify(p){return Promise.resolve(p.getSignedData()).then(function(sd){
-      return fetch(VERIFY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({signedData:sd})});})
-    .then(function(r){return r.json();}).then(function(j){return !!(j&&j.ok&&j.productId===p.productId);}).catch(function(){return false;});}
+  // a purchase is shown to our server as Pikabu signed it; the server checks the signature and gives the goods
+  function signed(p){return Promise.resolve(p.getSignedData()).then(function(sd){return {sd:sd,purchaseId:p.purchaseId,productId:p.productId,consumable:!!p.isConsumable};},function(){return null;});}
   function make(sdk){
-    var A=sdk.ads||{},st=sdk.store,owned={},pending=[],products=[];
+    var A=sdk.ads||{},st=sdk.store,earlier=[],products=[];
     var sup=function(x){return !!(x&&x.isSupported);};
     var store=st?{
-      products:function(){return products;},owned:function(){return Object.keys(owned);},pending:function(){return pending.splice(0);},
+      products:function(){return products;},earlier:function(){return earlier.splice(0);},
       buy:function(id){return Promise.resolve(st.purchase({productId:id})).then(function(r){
           if(!r||!r.success)return {ok:false,reason:r&&r.reason};
-          return verify(r.purchase).then(function(ok){if(ok&&!r.purchase.isConsumable)owned[id]=true;return {ok:ok,purchaseId:r.purchase.purchaseId,reason:ok?'':'VERIFY'};});
+          return signed(r.purchase).then(function(x){return x?{ok:true,sd:x.sd,purchaseId:x.purchaseId,consumable:x.consumable}:{ok:false,reason:'SIGN'};});
         },function(){return {ok:false,reason:'UNKNOWN'};});},
       consume:function(pid){try{return Promise.resolve(st.consumePurchase(pid)).catch(function(){});}catch(e){return Promise.resolve();}}
     }:null;
     if(st)Promise.resolve(st.getProducts()).then(function(list){
         products=(list||[]).map(function(x){return {id:x.id,price:Math.round(x.price/100),label:x.formattedPrice};});
-        return Promise.resolve(st.getPurchases()).then(function(ps){return Promise.all((ps||[]).map(function(p){return verify(p).then(function(ok){
-          if(!ok)return;if(p.isConsumable)pending.push({productId:p.productId,purchaseId:p.purchaseId});else owned[p.productId]=true;});}));});
-      }).then(function(){log('store',products.length,Object.keys(owned).join(','),pending.length);try{dispatchEvent(new Event('pf-store'));}catch(e){}},function(e){log('store err',e&&e.message);});
+        // purchases made earlier (and coin packs not yet given) are shown to the server again; it gives each only once
+        return Promise.resolve(st.getPurchases()).then(function(ps){return Promise.all((ps||[]).map(function(p){return signed(p).then(function(x){if(x)earlier.push(x);});}));});
+      }).then(function(){log('store',products.length,earlier.length);try{dispatchEvent(new Event('pf-store'));}catch(e){}},function(e){log('store err',e&&e.message);});
     return {kind:'pikabu',store:store,
       canRewarded:function(){return sup(A.rewarded)?Promise.resolve(A.rewarded.canShow()).catch(function(){return false;}):Promise.resolve(false);},
       rewarded:function(){if(!sup(A.rewarded))return Promise.resolve(false);return Promise.resolve(A.rewarded.canShow()).then(function(ok){

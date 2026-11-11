@@ -349,6 +349,180 @@ function mapMove(c,m){return m;}
 
 
 ;
+// Progression data: campaign, goals, shop, achievements, daily gift, statistics.
+// Goals: 'win', 'first', and numbered ones: takeN (won taking at most N times), fastN (won within N bouts),
+// transferN (won after at least N transfers). Old names stay readable for old saves.
+const GOAL_ALIAS={noTake:'take0',fast:'fast16',transfer:'transfer2'};
+const times=n=>n===1?'одного раза':n+' раз';
+const wordN=(n,a,b,c)=>{const m=n%10,h=n%100;return n+' '+(m===1&&h!==11?a:m>=2&&m<=4&&(h<12||h>14)?b:c);};
+function goalParse(k){k=GOAL_ALIAS[k]||k;const m=/^(take|fast|transfer)(\d+)$/.exec(k);return m?{k:m[1],n:+m[2]}:{k};}
+function goalInfo(key){const {k,n}=goalParse(key);
+  if(k==='win')return {t:'Не остаться дураком',short:'Победа',d:'победите'};
+  if(k==='first')return {t:'Выйти из игры первым',short:'Первым',d:'выйдите из игры первым'};
+  if(k==='pogony')return {t:'Повесить погоны',short:'Погоны',d:'повесьте сопернику погоны'};
+  if(k==='take')return n===0?{t:'Победить, ни разу не взяв',short:'Без взяток',d:'победите, ни разу не взяв'}:
+    {t:`Победить, взяв не больше ${times(n)}`,short:`≤ ${n} ${n===1?'взятки':'взяток'}`,d:`победите, взяв не больше ${times(n)}`};
+  if(k==='fast')return {t:`Победить за ${wordN(n,'ход','хода','ходов')} или быстрее`,short:`≤ ${wordN(n,'хода','ходов','ходов')}`,d:`победите за ${wordN(n,'ход','хода','ходов')} или быстрее`};
+  if(k==='transfer')return n===1?{t:'Победить, хотя бы раз переведя',short:'Перевод',d:'победите, хотя бы раз переведя'}:
+    {t:`Победить, переведя хотя бы ${n} раза`,short:`${n} перевода`,d:`победите, переведя хотя бы ${n} раза`};
+  return {t:key,short:key,d:key};}
+const GOALS=new Proxy({},{get:(o,k)=>goalInfo(String(k))});
+// r = everything known about the finished game from the player's side
+function goalMet(key,r){const {k,n}=goalParse(key),win=r.win;switch(k){
+  case'win':return win;case'first':return r.firstOut;case'pogony':return win&&r.pogGiven;
+  case'take':return win&&r.takes<=n;case'fast':return win&&r.bouts<=n;case'transfer':return win&&r.transfers>=n;}return false;}
+// The road to the tsar: ten places, each with its own house rules. Goals are fitted by simulation (autoGoals).
+const RULE_TEXT={open:'карты соперника открыты',dark:'козырь спрятан под платком',fog:'не видно, сколько карт у соперников',
+  neighbors:'подкидывают только соседи',show:'перевод показом козыря',chest:'в колоде спрятан клад',timer:'на каждый ход 12 секунд',noLimit:'подкидывать можно без лимита',cheat:'Кощей жульничает — лови!',teams:'пара на пару: напротив — ваш напарник'};
+const LOCS=[
+  {id:'village',name:'Деревня',table:'sukno',rule:'Классический подкидной',story:'Глашатай прокричал: царь объявил турнир по дураку, победителю — полцарства! Начинать придётся с родной деревни.',
+   stages:[{name:'Учёба у пастуха',opps:['vanka'],mode:'podkidnoy',deck:36,rules:{open:true},goals:['win','take2','fast18']},
+           {opps:['kuzmich'],mode:'podkidnoy',deck:36},
+           {opps:['nura'],mode:'podkidnoy',deck:36},
+           {name:'Деревенский турнир',opps:['kuzmich','nura','vanka'],mode:'podkidnoy',deck:36,boss:1}]},
+  {id:'fair',name:'Ярмарка',table:'yarmarka',rule:'Переводной дурак',story:'На ярмарке играют на переводного: отбиваться не хочешь — переведи следующему.',
+   stages:[{opps:['tishka'],mode:'perevodnoy',deck:36},
+           {opps:['matryona'],mode:'podkidnoy',deck:36},
+           {opps:['kupets'],mode:'perevodnoy',deck:36},
+           {name:'Ярмарочный стол',opps:['tishka','matryona','kupets'],mode:'perevodnoy',deck:36,boss:1}]},
+  {id:'inn',name:'Постоялый двор',table:'izba',rule:'Короткая колода на 24 карты',story:'На тракте играют быстро: колода с девяток, пока ямщик лошадей меняет.',
+   stages:[{opps:['erofey'],mode:'podkidnoy',deck:24},
+           {opps:['pelageya'],mode:'perevodnoy',deck:24},
+           {opps:['foma'],mode:'podkidnoy',deck:24,rules:{noLimit:true}},
+           {name:'Ночь на постоялом',opps:['erofey','pelageya','foma'],mode:'perevodnoy',deck:24,rules:{noLimit:true},boss:1}]},
+  {id:'town',name:'Город',table:'barhat',rule:'Большая колода с джокерами',story:'В городе играют большой колодой — с двойками и джокерами. Джокер бьёт любую карту.',
+   stages:[{opps:['prokhor'],mode:'podkidnoy',deck:54},
+           {opps:['aglaya'],mode:'perevodnoy',deck:54},
+           {opps:['akim'],mode:'podkidnoy',deck:54},
+           {name:'Городской клуб',opps:['prokhor','aglaya','akim'],mode:'podkidnoy',deck:54,boss:1}]},
+  {id:'hut',name:'Избушка Бабы-Яги',table:'izba',rule:'Тёмный козырь',story:'Избушка повернулась к тебе передом. Яга прячет козырь под платком — масть узнаешь, когда кто-нибудь им побьёт.',
+   stages:[{opps:['bayun'],mode:'perevodnoy',deck:36,rules:{dark:true}},
+           {opps:['leshy','bayun'],mode:'podkidnoy',deck:36,rules:{dark:true}},
+           {opps:['yaga'],mode:'perevodnoy',deck:36,rules:{dark:true}},
+           {name:'Ступа и помело',opps:['yaga','leshy','bayun'],mode:'perevodnoy',deck:36,rules:{dark:true,fog:true},boss:1}]},
+  {id:'outpost',name:'Богатырская застава',table:'sukno',rule:'Подкидывают только соседи',story:'У богатырей порядок: подкидывает только тот, кто ходит, да сосед отбивающегося.',
+   stages:[{opps:['alesha','dobrynya'],mode:'podkidnoy',deck:36,rules:{neighbors:true}},
+           {opps:['ilya','alesha'],mode:'perevodnoy',deck:36,rules:{neighbors:true}},
+           {opps:['dobrynya','alesha','prokhor'],mode:'podkidnoy',deck:52,rules:{neighbors:true}},
+           {name:'Богатырский пир',opps:['ilya','dobrynya','alesha','voevoda'],mode:'perevodnoy',deck:52,rules:{neighbors:true},boss:1}]},
+  {id:'merchant',name:'Купеческий дом',table:'yarmarka',rule:'Перевод показом козыря и клад',story:'У купцов можно перевести, лишь показав козырь. А в колоде спрятан клад — кому достанется?',
+   stages:[{opps:['mitrofan'],mode:'perevodnoy',deck:36,rules:{show:true,chest:true}},
+           {opps:['varvara'],mode:'perevodnoy',deck:52,rules:{show:true,chest:true}},
+           {opps:['mitrofan','varvara'],mode:'perevodnoy',deck:52,rules:{show:true,chest:true}},
+           {name:'Купеческая сделка',opps:['varvara','kupets','mitrofan'],mode:'perevodnoy',deck:52,rules:{show:true,chest:true},boss:1}]},
+  {id:'terem',name:'Боярский терем',table:'palaty',rule:'Ход на время',story:'Бояре не любят ждать: на каждый ход — двенадцать ударов сердца.',
+   stages:[{opps:['voevoda'],mode:'podkidnoy',deck:36,rules:{timer:true}},
+           {opps:['klyuchnitsa'],mode:'perevodnoy',deck:52,rules:{timer:true}},
+           {opps:['boyarin'],mode:'perevodnoy',deck:36,rules:{timer:true}},
+           {name:'Боярская дума',opps:['voevoda','klyuchnitsa','boyarin','akim'],mode:'perevodnoy',deck:52,rules:{timer:true},boss:1}]},
+  {id:'koschei',name:'Кощеево царство',table:'barhat',rule:'Туман и шулер',story:'В Кощеевом царстве всё в тумане, а сам Кощей жульничает. Заметил неправильную карту на столе — жми «Поймал!».',
+   stages:[{opps:['kikimora'],mode:'perevodnoy',deck:36,rules:{fog:true}},
+           {opps:['gorynych'],mode:'podkidnoy',deck:52,rules:{fog:true}},
+           {opps:['kikimora','gorynych'],mode:'perevodnoy',deck:36,rules:{fog:true}},
+           {name:'Кощей Бессмертный',opps:['koschei'],mode:'perevodnoy',deck:36,rules:{cheat:true},boss:1}]},
+  {id:'palace',name:'Царский двор',table:'palaty',rule:'Финал — парный дурак',story:'Двери палат открыты. Развесели царевну, обыграй царя — а на пиру Несмеяна сядет с тобой в пару против царя и Кощея.',
+   stages:[{opps:['nesmeyana'],mode:'perevodnoy',deck:36,rules:{show:true}},
+           {opps:['nesmeyana','boyarin'],mode:'podkidnoy',deck:36},
+           {name:'Царь Горох',opps:['tsar'],mode:'perevodnoy',deck:36,rules:{show:true},boss:1},
+           {name:'Царский пир: пара на пару',opps:['tsar','nesmeyana','koschei'],mode:'podkidnoy',deck:36,rules:{teams:true},boss:1}]}
+];
+// Extra goals for a stage, numbers measured on a strong player (≈ a third to a half of the wins meet each).
+function autoGoals(st,li,si){const n=st.opps.length+1,d=st.deck,big=d>=52,per=st.mode==='perevodnoy',r=st.rules||{};
+  const take=n===2?(d===24?0:d===36?1:5):n===3?(d===24||d===36?0:d===54?2:1):(big?1:0);
+  const fast=d===24?8:d===36?14:33;
+  const pool=[];
+  if(n===2){pool.push('take'+take,'fast'+fast);if(per)pool.push('transfer'+(r.show?3:2));}
+  else{pool.push('first','take'+take);if(per)pool.push('transfer'+(n===3?2:1));}
+  const k=(li*7+si*3)%pool.length;const a=pool[k],b=pool[(k+1)%pool.length];
+  return ['win',a,b];}
+LOCS.forEach((L,li)=>L.stages.forEach((st,si)=>{if(!st.goals)st.goals=autoGoals(st,li,si);}));
+const STARS_MAX=LOCS.reduce((a,l)=>a+l.stages.length*3,0);
+const SHOP={
+  backs:[{id:'gzhel',name:'Гжель',price:0},{id:'hohloma',name:'Хохлома',price:900},{id:'matr',name:'Матрёшки',price:1200},{id:'gorodets',name:'Городец',price:1500},
+         {id:'mezen',name:'Мезень',price:1800},{id:'zhostovo',name:'Жостово',price:2400},{id:'kruzhevo',name:'Вологодское кружево',price:2600},{id:'pavlov',name:'Павловский платок',price:3000},{id:'boyar',name:'Боярская',price:-1,how:'Только в «Боярском пакете» (Казна)'},{id:'palekh',name:'Палех',price:3500},{id:'tsar',name:'Царская',price:-1,how:'Награда за Царский пир'}],
+  faces:[{id:'classic',name:'Классическая',price:0},{id:'big',name:'Крупные знаки',price:300,d:'Большие значки — удобно на телефоне'},{id:'four',name:'Четыре цвета',price:700,d:'Каждая масть своим цветом'},{id:'night',name:'Ночная',price:1000,d:'Тёмные карты — не слепят вечером'},
+         {id:'lubok',name:'Лубок',price:1500,d:'Яркая народная картинка'},
+         {id:'russ',name:'Русская',price:2200,d:'Цари, царицы и богатыри'},{id:'skaz',name:'Сказочная',price:-1,d:'Царь, Яга, Кощей и другие герои игры',how:'Награда за первую победу в игре с друзьями (скоро)'},{id:'gold',name:'Золотая',price:-1,how:'Награда за все 120 звёзд'}],
+  tables:[{id:'sukno',name:'Зелёное сукно',price:0},{id:'barhat',name:'Синий бархат',price:1200},{id:'dacha',name:'Дачная веранда',price:1800},{id:'izba',name:'Изба',price:2000},{id:'kupe',name:'Купе поезда',price:2500},
+          {id:'yarmarka',name:'Ярмарка',price:3000},{id:'morozko',name:'Морозко',price:-1,how:'Награда за 7 выполненных заданий дня'},{id:'palaty',name:'Царские палаты',price:-1,how:'Награда за победу над царём'}]
+};
+const GIFTS=[20,30,40,50,60,80,150];
+const ACH=[
+  {id:'w1',name:'Первая победа',d:'Выиграть партию',f:s=>s.wins>=1,c:20},
+  {id:'w10',name:'Знаток',d:'Выиграть 10 партий',f:s=>s.wins>=10,c:50},
+  {id:'w50',name:'Мастер стола',d:'Выиграть 50 партий',f:s=>s.wins>=50,c:150},
+  {id:'g100',name:'Завсегдатай',d:'Сыграть 100 партий',f:s=>s.games>=100,c:150},
+  {id:'pogG',name:'Погоны вручены',d:'Повесить сопернику погоны',f:s=>s.pogGiven>=1,c:50},
+  {id:'pogR',name:'Ну и погоны…',d:'Получить погоны самому',f:s=>s.pogGot>=1,c:20},
+  {id:'clean',name:'Неприкасаемый',d:'Победить, ни разу не взяв',f:s=>s.noTakeWins>=1,c:50},
+  {id:'st5',name:'Полоса удачи',d:'5 побед подряд',f:s=>s.bestStreak>=5,c:100},
+  {id:'tr20',name:'Переводчик',d:'Сделать 20 переводов',f:s=>s.transfers>=20,c:50},
+  {id:'m4',name:'Шумная компания',d:'Победить за столом на 4 игрока или больше',f:s=>s.bigWins>=1,c:50},
+  {id:'m6',name:'Полный стол',d:'Не остаться дураком за столом на 6',f:s=>s.sixWins>=1,c:100},
+  {id:'j54',name:'С джокерами',d:'Победить с колодой на 54 карты',f:s=>s.win54>=1,c:40},
+  {id:'loc1',name:'Деревенский чемпион',d:'Пройти Деревню',f:s=>s.locsDone>=1,c:60},
+  {id:'loc2',name:'Гроза ярмарки',d:'Пройти Ярмарку',f:s=>s.locsDone>=2,c:80},
+  {id:'loc3',name:'Бывалый путник',d:'Пройти Постоялый двор',f:s=>s.locsDone>=3,c:100},
+  {id:'loc4',name:'Городской знаток',d:'Пройти Город',f:s=>s.locsDone>=4,c:120},
+  {id:'loc5',name:'Перехитрил Ягу',d:'Пройти Избушку Бабы-Яги',f:s=>s.locsDone>=5,c:150},
+  {id:'loc6',name:'Названый богатырь',d:'Пройти Богатырскую заставу',f:s=>s.locsDone>=6,c:170},
+  {id:'loc7',name:'Купеческий гость',d:'Пройти Купеческий дом',f:s=>s.locsDone>=7,c:190},
+  {id:'loc8',name:'Боярский гость',d:'Пройти Боярский терем',f:s=>s.locsDone>=8,c:220},
+  {id:'loc9',name:'Нашёл иглу',d:'Пройти Кощеево царство',f:s=>s.locsDone>=9,c:260},
+  {id:'loc10',name:'Полцарства',d:'Пройти Царский двор',f:s=>s.locsDone>=10,c:400},
+  {id:'s30',name:'Звёздный путь',d:'Собрать 40 звёзд в походе',f:s=>s.stars>=40,c:120},
+  {id:'s60',name:'Звездочёт',d:'Собрать 80 звёзд в походе',f:s=>s.stars>=80,c:200},
+  {id:'s120',name:'Все звёзды',d:'Собрать все 120 звёзд',f:s=>s.stars>=120,c:400},
+  {id:'col',name:'Коллекционер',d:'Собрать 6 предметов в лавке',f:s=>s.owned>=6,c:100}
+];
+
+
+/* ---------- rules of the economy, the same in the browser and on the server ---------- */
+const DAILY_REWARD=80;
+// the day runs on Moscow time for everyone, so a gift or a task is the same wherever the player is
+function dayOf(t){const d=new Date(t+3*3600e3);return d.getUTCFullYear()+'-'+(d.getUTCMonth()+1)+'-'+d.getUTCDate();}
+function prevDayOf(t){return dayOf(t-86400e3);}
+function dailyTaskFor(d,alt){let h=7;for(const ch of d)h=(h*31+ch.charCodeAt(0))>>>0;
+  // a task swapped for another stays swapped for the rest of the day
+  if(alt&&alt.day===d)h=(h^(alt.n*2654435761))>>>0;const r=makeRng(h);
+  const mode=r()<.5?'podkidnoy':'perevodnoy',deck=r()<.3?54:36,players=2+Math.floor(r()*3),big=deck===54;
+  // goal numbers fitted by simulation so a good player manages them in roughly a third of the wins or more
+  const pool=['take'+(players===2?(big?5:1):players===3?(big?1:0):(big?1:0))];
+  if(mode==='perevodnoy')pool.push('transfer'+(players===4?1:2));
+  if(players>2)pool.push('first');else pool.push('fast'+(big?34:14));
+  const goal=pool[Math.floor(r()*pool.length)];return {mode,deck,players,goal};}
+function freshEco(){return {coins:0,owned:['gzhel','sukno','classic'],back:'gzhel',face:'classic',tableSkin:'sukno',
+  camp:{},daily:{day:'',done:false},gift:{day:'',streak:0},ach:{},iap:{},iapDone:{},
+  st:{games:0,wins:0,losses:0,draws:0,streak:0,bestStreak:0,pogGiven:0,pogGot:0,noTakeWins:0,transfers:0,takes:0,firstOuts:0,bigWins:0,sixWins:0,win54:0,dailyCount:0,coinsEarned:0,
+      byMode:{podkidnoy:{g:0,w:0},perevodnoy:{g:0,w:0}},byDeck:{36:{g:0,w:0},54:{g:0,w:0}},byPlayers:{}}};}
+const ECO_KEYS=['coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail'];
+function campStars(camp){let n=0;for(const k in camp)n+=camp[k].stars.reduce((a,b)=>a+b,0);return n;}
+function campRec(camp,l,i){return camp[l+'.'+i]||{won:false,stars:[0,0,0]};}
+function campLocDone(camp,li){return campRec(camp,LOCS[li].id,LOCS[li].stages.length-1).won;}
+function campLocsDone(camp){let n=0;LOCS.forEach((l,i)=>{if(campLocDone(camp,i))n++;});return n;}
+function achDue(eco){const s=Object.assign({},eco.st,{stars:campStars(eco.camp),locsDone:campLocsDone(eco.camp),owned:eco.owned.length});return ACH.filter(a=>!eco.ach[a.id]&&a.f(s));}
+function shopItem(id){for(const k of ['backs','faces','tables']){const it=SHOP[k].find(x=>x.id===id);if(it)return Object.assign({kind:k},it);}return null;}
+
+/* ---------- rewards for games with bots ---------- */
+const CHEST_COINS=30,CAUGHT_COINS=10;
+function stageReward(li,si,rec){const st=LOCS[li].stages[si];return rec.won?8+3*li:40+25*li+(st.boss?100+20*li:0);}
+const POOLS={1:['vanka','kuzmich'],2:['nura','tishka','matryona','prokhor','aglaya','erofey','pelageya','mitrofan'],3:['kupets','akim','voevoda','klyuchnitsa','foma','bayun','leshy','alesha','dobrynya','varvara','kikimora'],4:['boyarin','nesmeyana','yaga','ilya','gorynych']};
+const LEVELS={easy:{name:'Лёгкие',mult:1,from:[1,2]},medium:{name:'Средние',mult:1.5,from:[2,1]},hard:{name:'Сильные',mult:2.2,from:[3,4,2]},mixed:{name:'Вперемешку',mult:1.6,from:'mix'}};
+const quickReward=(k,level)=>Math.round(8*k*LEVELS[level].mult+6);
+// who may sit at a quick table of this level (the strongest come only after they were beaten on the road)
+function levelPool(level,camp){const L=LEVELS[level]||LEVELS.medium;let pool=[];
+  if(L.from==='mix')pool=[...POOLS[1],...POOLS[2],...POOLS[3]];else for(const lv of L.from)pool.push(...POOLS[lv]);
+  if(level==='hard'&&campRec(camp,'koschei',3).won)pool.unshift('koschei');
+  if(level==='hard'&&campRec(camp,'palace',2).won)pool.unshift('tsar');
+  return pool;}
+
+
+;
+// Generated from chars.js by build.py: how each character plays (the server needs it too).
+const CHAR_AI={vanka:{style:'easy',over:{noise:.35}},kuzmich:{style:'easy',over:{}},nura:{style:'sly',over:{}},tishka:{style:'sly',over:{transferBias:1,multi:.9}},matryona:{style:'bold',over:{}},kupets:{style:'shrewd',over:{}},prokhor:{style:'bold',over:{noise:.06}},akim:{style:'shrewd',over:{multi:.3}},aglaya:{style:'sly',over:{greed:1.2}},voevoda:{style:'bold',over:{noise:.03,greed:.8}},klyuchnitsa:{style:'shrewd',over:{multi:.7}},boyarin:{style:'master',over:{transferBias:.5}},nesmeyana:{style:'master',over:{multi:.4,transferBias:.9}},erofey:{style:'bold',over:{noise:.1}},pelageya:{style:'sly',over:{}},foma:{style:'shrewd',over:{mc:{ms:30,horizon:2}}},bayun:{style:'sly',over:{transferBias:1}},leshy:{style:'bold',over:{noise:.05,greed:.75}},yaga:{style:'master',over:{mc:{ms:80,horizon:3}}},alesha:{style:'sly',over:{multi:.9}},dobrynya:{style:'shrewd',over:{}},ilya:{style:'master',over:{greed:.85}},mitrofan:{style:'sly',over:{}},varvara:{style:'shrewd',over:{multi:.6}},kikimora:{style:'sly',over:{transferBias:1,multi:.8}},gorynych:{style:'bold',over:{greed:.65,tossMax:6}},koschei:{style:'master',over:{mc:{ms:130,horizon:3},searchBudget:40000,cheat:true}},tsar:{style:'master',over:{searchBudget:40000}}};
+function charAI(id){const c=CHAR_AI[id]||{style:'bold',over:{}};return Object.assign({},STYLES[c.style],c.over);}
+
+;
 // Friends' table: the authoritative game on the server.
 // A room is a plain JSON object kept in the database. The game itself is not stored: it is rebuilt
 // from the seed and the log of moves on every request (a few hundred moves at most), so the stored
@@ -367,7 +541,7 @@ function makeCode(rnd){return CODE_WORDS[Math.floor(rnd()*CODE_WORDS.length)]+'-
 // codes are typed by people: accept latin look-alikes, spaces, any case
 function normCode(s){s=String(s||'').toUpperCase().replace(/\s+/g,'').replace(/Ё/g,'Ё');
   const lat={A:'А',B:'В',C:'С',E:'Е',H:'Н',K:'К',M:'М',O:'О',P:'Р',T:'Т',X:'Х',Y:'У'};s=s.replace(/[ABCEHKMOPTXY]/g,ch=>lat[ch]);
-  const m=/^([А-ЯЁ]+)-?(\d{3})$/.exec(s);return m?m[1]+'-'+m[2]:'';}
+  const m=/^([А-ЯЁ]+)-?(\d{3}|\d{8})$/.exec(s);return m?m[1]+'-'+m[2]:'';}
 function cleanName(s){s=String(s||'').replace(/[<>&"'`\\]/g,'').replace(/\s+/g,' ').trim().slice(0,14);return s||'Игрок';}
 
 function sanitizeOpts(o){o=o||{};const deck=[24,36,52,54].includes(+o.deck)?+o.deck:36;
@@ -388,6 +562,19 @@ function newRoom(opts,name,now,rnd,ac,q){
   if(q){room.q=q;room.qAt=now+QUICK_WAIT;}
   for(let i=0;i<o.n;i++)room.seats.push(i===0?Object.assign({k:'h',nm:cleanName(name),tok,seen:now},ac?{ac}:{}):{k:'o'});
   return {room,seat:0,tok};}
+
+// a game of one player with bots (the road, a quick game, the task of the day): the same table, run here
+function soloOpts(o){const deck=[24,36,52,54].includes(+o.deck)?+o.deck:36;const n=Math.max(2,Math.min(+o.n||2,MAX_PLAYERS[deck]));
+  const mode=o.mode==='perevodnoy'?'perevodnoy':'podkidnoy',R=o.rules||{},rules={};
+  for(const k of ['neighbors','noLimit','open','fog','dark','chest','cheat','teams','show','timer'])if(R[k])rules[k]=true;
+  if(rules.teams&&n!==4)delete rules.teams;if(rules.show&&mode!=='perevodnoy')delete rules.show;if(rules.open&&rules.fog)delete rules.fog;if(rules.neighbors&&n<3)delete rules.neighbors;
+  return {deck,n,mode,rules,timer:rules.timer?12:0,level:['easy','medium','hard','mixed'].includes(o.level)?o.level:'medium'};}
+function newSolo(o,chars,solo,name,now,rnd,ac){
+  const tok=rndToken(rnd),opts=soloOpts(Object.assign({},o,{n:chars.length+1}));
+  // a long code nobody will guess or type: only the player knows it
+  const room={code:makeCode(rnd)+String(Math.floor(rnd()*1e5)).padStart(5,'0'),v:1,born:now,exp:now+ROOM_TTL,opts,host:0,st:'lobby',seed:0,game:0,log:[],at:now,dl:0,chat:[],ci:0,fin:null,solo,
+    seats:[Object.assign({k:'h',nm:cleanName(name),tok,seen:now},ac?{ac}:{}),...chars.map(ch=>({k:'b',ch}))]};
+  start(room,null,now,rnd);return {room,tok};}
 
 function seatOf(room,tok){return tok?room.seats.findIndex(s=>s.k==='h'&&s.tok===tok):-1;}
 function humans(room){return room.seats.filter(s=>s.k==='h').length;}
@@ -420,15 +607,15 @@ function configure(room,tok,ch){
   room.v++;return null;}
 
 function start(room,tok,now,rnd){
-  if(room.q&&tok!==null)return 'quick'; // open tables start by themselves
-  if(!room.q&&seatOf(room,tok)!==room.host)return 'not host';if(room.st==='play')return 'already';
+  if((room.q||room.solo)&&tok!==null)return 'quick'; // open tables and games with bots start by themselves
+  if(!room.q&&!room.solo&&seatOf(room,tok)!==room.host)return 'not host';if(room.st==='play')return 'already';
   const used=new Set();
   room.seats.forEach((s,i)=>{if(s.k==='h'){s.away=false;s.idle=false;s.to=0;return;}
     if(room.q)s.ch=null;
     let ch=s.ch&&!used.has(s.ch)?s.ch:null;
     if(!ch){const pool=BOT_CHARS.filter(c=>!used.has(c));ch=pool[Math.floor(rnd()*pool.length)];}
     used.add(ch);room.seats[i]={k:'b',ch};});
-  room.st='play';room.seed=1+Math.floor(rnd()*2147483646);room.game++;room.log=[];room.fin=null;room.at=now;room.dl=0;
+  room.st='play';room.seed=1+Math.floor(rnd()*2147483646);room.game++;room.log=[];room.fin=null;room.at=now;room.dl=0;room.cc=0;
   room.chest=-1;
   if(room.opts.rules.chest){const left=room.opts.deck-room.opts.n*6;if(left>=3)room.chest=1+Math.floor(rnd()*(left-1));} // index in the deck array, never the trump at 0
   room.v++;schedule(room,now);return null;}
@@ -492,9 +679,11 @@ function schedule(room,now,g){
   g=g||build(room).g;if(g.over){room.dl=0;return;}
   const tm=g.toMove();
   if(controlled(room,tm)){room.dl=0;return;}
-  room.dl=room.at+room.opts.timer*1000;}
+  room.dl=room.opts.timer?room.at+room.opts.timer*1000:0;}
 function botDelay(room,g,tm){
   if(room.seats[tm].away||room.seats[tm].idle)return 700;
+  // a player who is out of the game watches the rest played out quickly
+  if(room.solo&&!g.active(0))return 320;
   const run=lastRun(room,g);
   // give a human attacker time to add a second card before a bot answers
   const more=run>=0&&!controlled(room,run)&&g.hands[run].some(c=>g.canAttack(run,c));
@@ -504,11 +693,22 @@ function safeMove(g,p){
   if(!g.table.length){const c=g.hands[p].slice().sort((a,b)=>(g.isTrump(a)-g.isTrump(b))||g.rk(a)-g.rk(b)).find(c=>g.canAttack(p,c));return {t:'attack',c:c.id};}
   return {t:'done'};}
 function botMove(room,g,p){
+  const seat=room.seats[p],solo=!!room.solo&&seat.k==='b';
   // bots look at the table: a wrong card is sometimes called out
-  if(g.rules.cheat&&g.cheater()>=0&&g.cheater()!==p&&room.seats[p].k==='b'&&Math.random()<.45)return {t:'acc'};
-  const st=room.seats[p].k==='b'?STYLES[BOT_STYLE[room.opts.level]]:STYLES.bold;
+  if(g.rules.cheat&&g.cheater()>=0&&g.cheater()!==p&&seat.k==='b'&&Math.random()<.45)return {t:'acc'};
+  const st=solo&&typeof charAI==='function'?charAI(seat.ch):seat.k==='b'?STYLES[BOT_STYLE[room.opts.level]]:STYLES.bold;
   const m=aiMove(g,p,st)||g.legal(p).find(x=>x.t==='take'||x.t==='done');
+  // a cheating character (Koschei) sometimes lays a wrong card instead
+  if(solo&&st.cheat){const c=cheatMove(room,g,p,m);if(c)return c;}
   return {t:m.t,c:m.c?m.c.id:undefined,i:m.i};}
+// as defender it covers with a card that does not beat; as a thrower it adds a card of another rank
+function cheatMove(room,g,p,m){if(!g.rules.cheat||(room.cc||0)>=4||g.cheater()>=0||!m)return null;const h=g.hands[p];
+  if(m.t==='take'&&p===g.def&&Math.random()<.5){const i=g.table.findIndex(x=>!x.d);if(i<0)return null;const a=g.table[i].a;
+    const fake=h.filter(c=>c.r!=='J'&&!g.beats(c,a)&&!g.isTrump(c)).sort((x,y)=>(x.s===a.s?-1:1)-(y.s===a.s?-1:1)||g.rk(x)-g.rk(y))[0];
+    if(fake){room.cc=(room.cc||0)+1;return {t:'cd',c:fake.id,i};}}
+  if(m.t==='done'&&p!==g.def&&Math.random()<.22){const rks=g.ranksOnTable();const extra=h.filter(c=>c.r!=='J'&&!rks.has(c.r)&&!g.isTrump(c)).sort((x,y)=>g.rk(x)-g.rk(y))[0];
+    if(extra){room.cc=(room.cc||0)+1;return {t:'ca',c:extra.id};}}
+  return null;}
 // let bots and timers do what is due; called on every request. Returns true if anything moved.
 function advance(room,now,rnd){
   // an open table starts when it is full or has waited long enough; one that everybody left closes
@@ -518,7 +718,7 @@ function advance(room,now,rnd){
     return false;}
   if(room.st!=='play')return false;let moved=false;
   // players silent for a long time are looked after by a bot until they come back
-  for(const s of room.seats)if(s.k==='h'&&!s.away&&now-(s.seen||0)>45000){s.away=true;room.v++;moved=true;}
+  if(!room.solo)for(const s of room.seats)if(s.k==='h'&&!s.away&&now-(s.seen||0)>45000){s.away=true;room.v++;moved=true;}
   for(let guard=0;guard<60;guard++){
     const {g}=build(room);g._ap=[];if(g.over){finishIfOver(room,g,now);break;}
     const tm=g.toMove();
@@ -562,7 +762,7 @@ function snapshotFor(room,g,s){
     over:g.over,fool:g.fool,pogony:g.pogony,loserTeam:g.loserTeam==null?null:g.loserTeam,cheat:g.table.map(x=>x.cheat!=null?x.cheat:-1),
     chest:room.chest>=0&&room.chest<g.deck.length?room.chest:-1,logLen:room.log.length};}
 function lobbyFor(room,s){
-  return {code:room.code,v:room.v,st:room.st,game:room.game,host:room.host,me:s,opts:room.opts,dl:room.dl,q:room.q||undefined,qAt:room.q?room.qAt:undefined,
+  return {code:room.code,v:room.v,st:room.st,game:room.game,host:room.host,me:s,opts:room.opts,dl:room.dl,q:room.q||undefined,qAt:room.q?room.qAt:undefined,solo:room.solo||undefined,
     seats:room.seats.map((x,i)=>({k:x.k,nm:x.k==='h'?x.nm:undefined,ch:x.ch,away:!!(x.away||x.idle),on:x.k==='h'&&!x.away})),
     fin:room.fin};}
 // everything a client needs after `since` (log index) and `cs` (chat index); since<0 asks for a snapshot
@@ -640,12 +840,261 @@ function topLists(store,now,me){
 
 
 ;
+// The player's belongings, kept on the server: coins, the shop, the road, tasks, gifts, achievements.
+// The browser only shows them and asks for changes; every change is checked here.
+// Needs rules.js (shop, achievements, tasks) and quick.js (accounts) in scope.
+
+const AD_COINS=60,AD_COINS_DAY=5,BAIL_COINS=500,MIGRATE_MAX=50000;
+const ADS_PLAT=new Set(['pikabu','web']); // coins for watching ads exist only where the platform pays well for them
+
+function ecoOf(x){if(!x.eco){x.eco=freshEco();}return x.eco;}
+// what the browser gets: everything it needs to draw, nothing secret
+function ecoView(x,news){const e=ecoOf(x),o={};for(const k of ECO_KEYS)if(e[k]!==undefined)o[k]=e[k];
+  return {eco:o,me:profile(x),news:news||[]};}
+function gain(e,n){e.coins+=n;e.st.coinsEarned=(e.st.coinsEarned||0)+Math.max(0,n);}
+function own(e,id){if(!e.owned.includes(id))e.owned.push(id);}
+// achievements are checked after every change and paid at once
+function payAch(e,news,now){for(const a of achDue(e)){e.ach[a.id]=now;gain(e,a.c);news.push({t:'ach',name:a.name,d:a.d,c:a.c});}}
+
+// a player who played before this version brings the save from the browser once; it is taken within reason
+function migrate(e,old){if(!old||typeof old!=='object'||old.v!==2)return;
+  e.coins=Math.max(0,Math.min(MIGRATE_MAX,Math.floor(+old.coins||0)));
+  if(Array.isArray(old.owned))for(const id of old.owned)if(shopItem(id))own(e,id);
+  for(const k of ['back','face','tableSkin'])if(typeof old[k]==='string'&&e.owned.includes(old[k]))e[k]=old[k];
+  if(old.camp&&typeof old.camp==='object')for(const k in old.camp){const r=old.camp[k];const [l,i]=k.split('.');const L=LOCS.find(x=>x.id===l);
+    if(L&&L.stages[+i]&&r&&Array.isArray(r.stars))e.camp[k]={won:!!r.won,stars:r.stars.slice(0,3).map(v=>v?1:0)};}
+  if(old.st&&typeof old.st==='object')for(const k in e.st){const v=old.st[k];if(typeof v==='number'&&typeof e.st[k]==='number')e.st[k]=Math.max(0,Math.min(1e6,Math.floor(v)));
+    else if(v&&typeof v==='object'&&typeof e.st[k]==='object')e.st[k]=JSON.parse(JSON.stringify(v));}
+  if(old.ach&&typeof old.ach==='object')for(const a of ACH)if(old.ach[a.id])e.ach[a.id]=+old.ach[a.id]||1;
+  if(old.gift&&typeof old.gift.day==='string')e.gift={day:old.gift.day,streak:Math.max(0,Math.min(GIFTS.length,+old.gift.streak||0))};
+  if(old.daily&&typeof old.daily.day==='string')e.daily={day:old.daily.day,done:!!old.daily.done};}
+
+// one request about belongings; returns the new state, or an error and the state as it is
+function ecoOp(store,ac,req,now){
+  const x=accGet(store,ac,now),e=ecoOf(x),news=[],today=dayOf(now),op=req.op,plat=/^(vk|ok)user/.test(ac)?'vk':String(req.plat||'web');
+  let err=null,res={};
+  if(op==='prof'){if(!x.migrated){x.migrated=1;migrate(e,req.mig);}}
+  else if(op==='buy'){const it=shopItem(String(req.id));
+    if(!it||it.price<=0)err='not for sale';else if(e.owned.includes(it.id))err='owned';else if(e.coins<it.price)err='coins';
+    else{e.coins-=it.price;own(e,it.id);e[{backs:'back',faces:'face',tables:'tableSkin'}[it.kind]]=it.id;}}
+  else if(op==='equip'){const it=shopItem(String(req.id));
+    if(!it||!e.owned.includes(it.id))err='not owned';else e[{backs:'back',faces:'face',tables:'tableSkin'}[it.kind]]=it.id;}
+  else if(op==='gift'){if(e.gift.day===today)err='taken';
+    else{const streak=e.gift.day===prevDayOf(now)?Math.min(e.gift.streak+1,GIFTS.length):1,amount=GIFTS[streak-1];
+      e.gift={day:today,streak};gain(e,amount);res.amount=amount;}}
+  else if(op==='giftx2'){if(!ADS_PLAT.has(plat))err='no ads';else if(e.gift.day!==today||e.gift.dbl===today)err='no gift';
+    else{const amount=GIFTS[e.gift.streak-1]||0;e.gift.dbl=today;gain(e,amount);res.amount=amount;}}
+  else if(op==='adcoins'){if(!ADS_PLAT.has(plat))err='no ads';else{if(!e.adCoins||e.adCoins.d!==today)e.adCoins={d:today,n:0};
+    if(e.adCoins.n>=AD_COINS_DAY)err='limit';else{e.adCoins.n++;gain(e,AD_COINS);res.amount=AD_COINS;}}}
+  else if(op==='dalt'){if(!ADS_PLAT.has(plat))err='no ads';else if(e.daily&&e.daily.day===today&&e.daily.done)err='done';
+    else e.dailyAlt={day:today,n:(e.dailyAlt&&e.dailyAlt.day===today?e.dailyAlt.n:0)+1};}
+  else if(op==='bail'){if(e.coins>=100)err='has coins';else if(e.bail===today)err='taken';else{e.bail=today;gain(e,BAIL_COINS);res.amount=BAIL_COINS;}}
+  else err='bad op';
+  payAch(e,news,now);x.t=now;accPut(store,ac,x);
+  return Object.assign(ecoView(x,news),res,err?{err}:{});}
+
+
+;
+// Games with bots, run on the server: what may be played, and what a finished game brings.
+// Needs rules.js, charai.js, room.js, quick.js and eco.js in scope.
+
+// what the player asked to play, checked against what they have opened
+function soloSetup(e,req){const k=String(req.kind||'');
+  if(k==='camp'){const li=+req.li,si=+req.si,L=LOCS[li];if(!L||!L.stages[si])return {err:'bad stage'};
+    const open=(li===0||campRec(e.camp,LOCS[li-1].id,LOCS[li-1].stages.length-1).won)&&(si===0||campRec(e.camp,L.id,si-1).won);
+    if(!open)return {err:'locked'};const st=L.stages[si];
+    return {opts:{mode:st.mode,deck:st.deck,rules:st.rules||{},level:'medium'},chars:st.opps.slice(),solo:{kind:'camp',li,si,goals:st.goals}};}
+  if(k==='daily'){const d=dailyTaskFor(dayOf(Date.now()),e.dailyAlt);
+    const pool=levelPool('medium',e.camp),chars=pickFrom(pool,d.players-1);
+    return {opts:{mode:d.mode,deck:d.deck,rules:{},level:'medium'},chars,solo:{kind:'daily',goals:['win',d.goal],day:dayOf(Date.now())}};}
+  if(k==='quick'){const level=LEVELS[req.level]?req.level:'medium',pool=levelPool(level,e.camp);
+    let chars=Array.isArray(req.opps)?req.opps.map(String).filter(c=>pool.includes(c)):[];chars=[...new Set(chars)];
+    const deck=[24,36,52,54].includes(+req.deck)?+req.deck:36,max={24:3,36:4,52:5,54:5}[deck],want=Math.max(1,Math.min(max,+req.n||chars.length||1));
+    if(chars.length!==want)chars=pickFrom(pool,want);
+    return {opts:{mode:req.mode,deck,rules:req.rules||{},level},chars,solo:{kind:'quick',level}};}
+  return {err:'bad kind'};}
+function pickFrom(pool,k){const a=pool.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a.slice(0,k);}
+
+// everything known about a finished game from the player's side (seat 0)
+function soloFacts(room,me){me=me||0;const {g,meta}=build(room),n=g.n,fool=g.fool,team=!!g.teams;
+  const win=team?g.loserTeam!==g.teams[me]:fool!==me&&!(n===2&&fool===-1);
+  let takes=0,transfers=0,caught=0;
+  room.log.forEach((e,i)=>{if(e.p!==me)return;if(e.t==='take')takes++;if(e.t==='transfer'||e.t==='show')transfers++;
+    if(e.t==='acc'){const M=meta[i];const ev=g.events.slice(M.e0,M.e1).find(x=>x.t==='accuse');if(ev&&ev.caught)caught++;else if(ev)takes++;}});
+  const lastM=meta[meta.length-1],lastOuts=lastM?g.events.slice(lastM.e0,lastM.e1).filter(x=>x.t==='out').map(x=>x.p):[];
+  let chest=false;if(room.chest>=0){const g0=new Game(gameOpts(room));const cc=g0.deck[room.chest];chest=!!cc&&g.events.some(x=>x.t==='draw'&&x.p===me&&x.c.id===cc.id);}
+  return {win,draw:fool===-1,fool:fool===me?0:fool<0?-1:1,n,firstOut:g.out[0]===me,takes,transfers,bouts:g.bouts,caught,chest,
+    pogGiven:g.pogony>0&&fool>=0&&fool!==me&&lastOuts.includes(me)&&(g.lastPlayed[me]||[]).some(c=>c.r==='6'),pogGot:g.pogony>0&&fool===me,
+    mode:g.mode,deck:g.deckSize};}
+function addStats(e,r){const s=e.st,n=r.n;s.games++;if(r.win)s.wins++;else if(r.fool===0)s.losses++;else s.draws++;
+  if(r.win){s.streak++;s.bestStreak=Math.max(s.bestStreak,s.streak);}else if(r.fool===0)s.streak=0;
+  if(r.pogGiven)s.pogGiven++;if(r.pogGot)s.pogGot++;if(r.win&&r.takes===0)s.noTakeWins++;if(r.firstOut)s.firstOuts++;
+  s.takes+=r.takes;s.transfers+=r.transfers;
+  if(r.win&&n>=4)s.bigWins++;if(r.win&&n>=6)s.sixWins++;if(r.win&&r.deck===54)s.win54++;
+  const bm=s.byMode[r.mode]||(s.byMode[r.mode]={g:0,w:0}),bd=s.byDeck[r.deck]||(s.byDeck[r.deck]={g:0,w:0}),bp=s.byPlayers[n]||(s.byPlayers[n]={g:0,w:0});bm.g++;bd.g++;bp.g++;if(r.win){bm.w++;bd.w++;bp.w++;}}
+function soloLoss(e,o){const s=e.st;s.games++;s.losses++;s.quits=(s.quits||0)+1;s.streak=0;
+  const bm=s.byMode[o.mode],bd=s.byDeck[o.deck]||(s.byDeck[o.deck]={g:0,w:0}),bp=s.byPlayers[o.n]||(s.byPlayers[o.n]={g:0,w:0});if(bm)bm.g++;bd.g++;bp.g++;}
+// counts as played once a card was on the table
+function soloCounts(room){if(room.st!=='play')return false;const {g}=build(room);return !g.over&&(g.bouts>0||g.table.length>0);}
+
+// a finished game with bots: statistics, the road's stars, the task of the day, coins
+function settleSolo(store,room,now){
+  if(!room.solo||!room.fin||room.fin.res)return false;const s=room.seats[0];if(!s.ac)return false;
+  const x=accGet(store,s.ac,now),e=ecoOf(x),r=soloFacts(room),S=room.solo,rw=[],news=[];let coins=0,stars=null;
+  addStats(e,r);
+  if(S.kind==='camp'){const L=LOCS[S.li],st=L.stages[S.si],key=L.id+'.'+S.si,prev=campRec(e.camp,L.id,S.si);
+    const got=st.goals.map(k=>goalMet(k,r)?1:0),all=prev.stars.map((v,i)=>v||got[i]),fresh=all.reduce((a,b)=>a+b,0)-prev.stars.reduce((a,b)=>a+b,0);
+    if(r.win)coins+=stageReward(S.li,S.si,prev);coins+=fresh*10;e.camp[key]={won:prev.won||r.win,stars:all};stars=got;
+    if(fresh>0)rw.push('★ +'+fresh);
+    if(r.win&&!prev.won){if(L.id==='palace'&&S.si===2&&!e.owned.includes('palaty')){own(e,'palaty');rw.push('Стол «Царские палаты»');}
+      if(L.id==='palace'&&S.si===3&&!e.owned.includes('tsar')){own(e,'tsar');rw.push('Рубашка «Царская»');}}
+    if(campStars(e.camp)>=STARS_MAX&&!e.owned.includes('gold')){own(e,'gold');rw.push('Колода «Золотая»');}}
+  else if(S.kind==='quick'){if(r.win)coins+=quickReward(r.n-1,S.level)+(r.pogGiven?10:0);else if(r.draw)coins+=5;}
+  else if(S.kind==='daily'){const got=S.goals.map(k=>goalMet(k,r)?1:0);stars=got;const done=e.daily&&e.daily.day===S.day&&e.daily.done;
+    if(got.every(Boolean)&&!done&&S.day===dayOf(now)){e.daily={day:S.day,done:true};coins+=DAILY_REWARD;rw.push('Задание дня выполнено');
+      e.st.dailyCount=(e.st.dailyCount||0)+1;if(e.st.dailyCount>=7&&!e.owned.includes('morozko')){own(e,'morozko');rw.push('Стол «Морозко»');}}
+    else if(!done)rw.push('Задание дня не выполнено — попробуйте ещё');}
+  if(r.chest){coins+=CHEST_COINS;rw.push('Клад +'+CHEST_COINS);}
+  if(r.caught){coins+=r.caught*CAUGHT_COINS;rw.push('Пойман шулер ×'+r.caught+': +'+r.caught*CAUGHT_COINS);}
+  if(coins&&r.win&&e.iap&&e.iap.boyar){coins*=2;rw.push('Боярский пакет: монеты ×2');}
+  if(coins){gain(e,coins);rw.unshift('+'+coins+' монет');}
+  e.lastWin=r.win&&coins>0?{code:room.code,amount:coins}:null;
+  if(e.live&&e.live.code===room.code)e.live=null;
+  payAch(e,news,now);x.t=now;accPut(store,s.ac,x);
+  room.fin.res={coins,rw,stars,r,news,eco:ecoView(x).eco};room.v++;return true;}
+
+// start a game with bots; an unfinished earlier one counts as lost
+async function soloStart(store,req,ac,now){
+  const x=accGet(store,ac,now),e=ecoOf(x),set=soloSetup(e,req);if(set.err)return {err:set.err};
+  if(e.live){const old=await store.load(e.live.code);if(old&&old.room.st==='play'&&soloCounts(old.room))soloLoss(e,e.live);if(old&&old.room.st==='play'){old.room.st='closed';old.room.v++;await store.save(old.room,old.ver);}e.live=null;}
+  for(let k=0;k<6;k++){const r=newSolo(set.opts,set.chars,set.solo,req.name,now,rndSecure,ac);
+    if(await store.create(r.room)){e.live={code:r.room.code,mode:r.room.opts.mode,deck:r.room.opts.deck,n:r.room.opts.n};accPut(store,ac,x);
+      return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now,due:nextDue(r.room)});}}
+  return {err:'busy'};}
+// leaving an unfinished game with bots: a loss, and the table closes
+function soloLeave(store,room,now){if(!room.solo)return;const s=room.seats[0];if(!s.ac)return;const x=accGet(store,s.ac,now),e=ecoOf(x);
+  if(soloCounts(room))soloLoss(e,{mode:room.opts.mode,deck:room.opts.deck,n:room.opts.n});
+  if(e.live&&e.live.code===room.code)e.live=null;room.st='closed';room.v++;accPut(store,s.ac,x);}
+// doubling the coins of the last win for an ad (where there are ads)
+function winDouble(store,ac,req,now){const x=accGet(store,ac,now),e=ecoOf(x),news=[];
+  if(/^(vk|ok)user/.test(ac)||!ADS_PLAT.has(String(req.plat||'web')))return Object.assign(ecoView(x),{err:'no ads'});
+  if(!e.lastWin||e.lastWin.code!==req.code)return Object.assign(ecoView(x),{err:'no win'});
+  const a=e.lastWin.amount;e.lastWin=null;gain(e,a);payAch(e,news,now);accPut(store,ac,x);return Object.assign(ecoView(x,news),{amount:a});}
+
+// a finished game with people (friends' table or an open table): statistics and coins for every person at it
+const FRIEND_WIN=30,FRIEND_WINS_DAY=5;
+function settleNet(store,room,now){
+  if(room.solo||!room.fin||room.fin.seatRes)return false;const out=[];
+  room.seats.forEach((s,i)=>{if(s.k!=='h'||!s.ac){out.push(null);return;}
+    const x=accGet(store,s.ac,now),e=ecoOf(x),r=soloFacts(room,i),rw=[],news=[];let coins=0;addStats(e,r);
+    if(room.q){const pay=(room.fin.pay||[])[i]||0,pts=(room.fin.pts||[])[i]||0;coins+=pay;
+      if(!pay)rw.push('Ставка '+room.q.stake+' проиграна');if(pts)rw.push('Рейтинг '+(pts>0?'+':'')+pts);}
+    else if(r.win&&room.seats.filter(z=>z.k==='h').length>=2){const d=dayOf(now);if(!e.netDay||e.netDay.d!==d)e.netDay={d,w:0};
+      if(e.netDay.w<FRIEND_WINS_DAY){e.netDay.w++;coins+=FRIEND_WIN;}else rw.push('Монеты за победы над друзьями — до 5 раз в день');}
+    if(r.win&&!e.owned.includes('skaz')){own(e,'skaz');rw.push('Колода «Сказочная»');}
+    if(r.chest){coins+=CHEST_COINS;rw.push('Клад +'+CHEST_COINS);}
+    if(r.caught){coins+=r.caught*CAUGHT_COINS;rw.push('Пойман шулер ×'+r.caught+': +'+r.caught*CAUGHT_COINS);}
+    if(coins){gain(e,coins);rw.unshift('+'+coins+' монет');}
+    payAch(e,news,now);accPut(store,s.ac,x);out.push({coins,rw,news});});
+  room.fin.seatRes=out;room.v++;return true;}
+// a seat at an open table costs the stake at once; leaving before the start gives it back
+function stakeTake(store,ac,stake,now){const x=accGet(store,ac,now),e=ecoOf(x);if(e.coins<stake)return false;e.coins-=stake;accPut(store,ac,x);return true;}
+function stakeBack(store,ac,stake,now){const x=accGet(store,ac,now),e=ecoOf(x);e.coins+=stake;accPut(store,ac,x);}
+
+
+;
+// Real-money purchases and platform accounts, checked on the server.
+// Secrets come from the machine's metadata (see vm.js): {pikabu:"…" or ["…"], vk:"…", ok:"…", allowTest:true}.
+// Needs eco.js and quick.js in scope.
+const crypto_=typeof require==='function'?require('crypto'):null;
+
+const IAP_COINS={coins3000:3000,coins10000:10000};
+const IAP_IDS=new Set(['noads','starter','boyar','coins3000','coins10000']);
+// what a product gives; permanent ones once, coin packs once per purchase
+function iapGrant(e,id,pid){if(!IAP_IDS.has(id))return false;if(!e.iapDone)e.iapDone={};if(!e.iap)e.iap={};
+  if(pid&&e.iapDone[pid])return false;
+  if(IAP_COINS[id]){if(pid)e.iapDone[pid]=1;gain(e,IAP_COINS[id]);return true;}
+  if(pid)e.iapDone[pid]=1;if(e.iap[id])return false;e.iap[id]=true;
+  if(id==='starter'){gain(e,2000);own(e,'gorodets');own(e,'russ');}
+  if(id==='boyar'){own(e,'boyar');e.iap.noads=true;}
+  if(id==='noads')e.iap.noads=true;
+  return true;}
+
+/* ---------- Pikabu: a purchase comes as a JWT signed (HS256) with the game's secret key ---------- */
+const b64url=buf=>buf.toString('base64').replace(/=+$/,'').replace(/\+/g,'-').replace(/\//g,'_');
+function jwtCheck(token,secret){const parts=String(token||'').split('.');if(parts.length!==3)return null;
+  try{const head=JSON.parse(Buffer.from(parts[0],'base64url').toString('utf8'));if(head.alg!=='HS256')return null;
+    const want=Buffer.from(b64url(crypto_.createHmac('sha256',secret).update(parts[0]+'.'+parts[1]).digest())),got=Buffer.from(parts[2]);
+    if(want.length!==got.length||!crypto_.timingSafeEqual(want,got))return null;
+    return JSON.parse(Buffer.from(parts[1],'base64url').toString('utf8'));}catch(e){return null;}}
+function pikabuPurchase(secrets,sd){const keys=[].concat(secrets.pikabu||[]).filter(Boolean);
+  for(const k of keys){const d=jwtCheck(sd,k);if(d&&d.productId)return d;}return null;}
+// the player shows a signed purchase; a purchase is used by one account only
+function iapClaim(store,ac,req,now){const x=accGet(store,ac,now),e=ecoOf(x),S=store.secrets||{},news=[];
+  if(!store.iapUsed)store.iapUsed=new Map();
+  const d=pikabuPurchase(S,req.sd);if(!d)return Object.assign(ecoView(x),{err:S.pikabu?'bad purchase':'not configured'});
+  if(d.isTestPurchase&&!S.allowTest)return Object.assign(ecoView(x),{err:'test purchase'});
+  const pid='pk:'+String(d.purchaseId||'');const owner=store.iapUsed.get(pid);
+  if(owner&&owner!==ac)return Object.assign(ecoView(x),{err:'used'});
+  store.iapUsed.set(pid,ac);if(store.accDirty)store.accDirty();
+  const given=iapGrant(e,String(d.productId),pid);payAch(e,news,now);accPut(store,ac,x);
+  return Object.assign(ecoView(x,news),{given,productId:d.productId,consumable:!!IAP_COINS[d.productId]});}
+
+/* ---------- VK and OK: who the player is, from the signed launch parameters ---------- */
+// sign = base64url(HMAC-SHA256(secret, the vk_* parameters sorted and joined as a query string))
+function vkUser(secrets,lp){if(!secrets.vk||!lp)return null;let q;try{q=new URLSearchParams(String(lp));}catch(e){return null;}
+  const keys=[...q.keys()].filter(k=>k.startsWith('vk_')).sort();if(!keys.length)return null;
+  const str=keys.map(k=>k+'='+encodeURIComponent(q.get(k))).join('&');
+  const want=b64url(crypto_.createHmac('sha256',secrets.vk).update(str).digest()),got=String(q.get('sign')||'');
+  if(!got||want.length!==got.length||!crypto_.timingSafeEqual(Buffer.from(want),Buffer.from(got)))return null;
+  const uid=q.get('vk_user_id');if(!/^\d+$/.test(uid||''))return null;
+  return {uid,ok:q.get('vk_client')==='ok'};}
+const platAcct=(uid,ok)=>(ok?'okuser':'vkuser')+uid.padStart(12,'0');
+// the account a request speaks for: in VK/OK the signed user, elsewhere the game's own private id
+function resolveAcct(store,req){
+  // until the VK key is in the machine's metadata, players are known by the game's own id, as everywhere
+  if(req.lp&&(store.secrets||{}).vk){const u=vkUser(store.secrets,req.lp);return u?platAcct(u.uid,u.ok):'';}
+  const a=cleanAcct(req.acct);return /^(vk|ok)user/.test(a)?'':a;}
+
+/* ---------- payment notifications from VK (POST, form) and OK (GET) ---------- */
+const VK_PRICES={noads:{t:'Без рекламы',vk:35,ok:249},starter:{t:'Стартовый набор',vk:21,ok:149},boyar:{t:'Боярский пакет',vk:57,ok:399},
+  coins3000:{t:'Мешок монет',vk:14,ok:99},coins10000:{t:'Царская казна',vk:35,ok:249}};
+const VK_PHOTO='https://ttgms.github.io/durak/vk/item.jpg';
+const md5=s=>crypto_.createHash('md5').update(s,'utf8').digest('hex');
+const sigOf=(p,secret)=>md5(Object.keys(p).filter(k=>k!=='sig').sort().map(k=>k+'='+p[k]).join('')+secret);
+const sameHex=(a,b)=>typeof a==='string'&&typeof b==='string'&&a.length===b.length&&crypto_.timingSafeEqual(Buffer.from(a.toLowerCase()),Buffer.from(b.toLowerCase()));
+function vkErr(code,msg,critical){return {error:{error_code:code,error_msg:msg,critical:!!critical}};}
+function vkNotify(store,p,now){const secret=(store.secrets||{}).vk;if(!secret)return vkErr(2,'not configured',false);
+  if(!sameHex(sigOf(p,secret),p.sig))return vkErr(10,'bad signature',true);
+  const type=String(p.notification_type||''),it=VK_PRICES[p.item],ok=/ok/i.test(String(p.site||''));
+  if(type.startsWith('get_item')){if(!it)return vkErr(20,'no such item',true);
+    return {response:{item_id:p.item,title:it.t,photo_url:VK_PHOTO,price:ok?it.ok:it.vk,expiration:3600}};}
+  if(type.startsWith('order_status_change')){
+    if(p.status!=='chargeable')return {response:{order_id:Number(p.order_id),app_order_id:Number(p.order_id)}};
+    const item=p.item||p.item_id;if(!VK_PRICES[item]||!/^\d+$/.test(String(p.user_id||'')))return vkErr(11,'bad order',true);
+    const ac=platAcct(String(p.user_id),ok),x=accGet(store,ac,now),e=ecoOf(x),news=[];
+    iapGrant(e,item,'vk:'+p.order_id);payAch(e,news,now);accPut(store,ac,x);
+    return {response:{order_id:Number(p.order_id),app_order_id:Number(p.order_id)}};}
+  return vkErr(11,'unknown notification',true);}
+function okNotify(store,q,now){const S=store.secrets||{},secret=S.ok||S.vk;
+  const xmlErr=(c,m)=>({err:true,code:c,body:`<?xml version="1.0" encoding="UTF-8"?><ns2:error_response xmlns:ns2="http://api.forticom.com/1.0/"><error_code>${c}</error_code><error_msg>${m}</error_msg></ns2:error_response>`});
+  if(!secret)return xmlErr(9999,'SYSTEM : not configured');
+  if(!sameHex(sigOf(q,secret),q.sig))return xmlErr(104,'PARAM_SIGNATURE : bad signature');
+  const it=VK_PRICES[q.product_code];if(!it)return xmlErr(1001,'CALLBACK_INVALID_PAYMENT : no such product');
+  if(Number(q.amount)!==it.ok)return xmlErr(1001,'CALLBACK_INVALID_PAYMENT : wrong amount');
+  if(!/^\d+$/.test(String(q.uid||'')))return xmlErr(1001,'CALLBACK_INVALID_PAYMENT : no user');
+  const ac=platAcct(String(q.uid),true),x=accGet(store,ac,now),e=ecoOf(x),news=[];iapGrant(e,q.product_code,'ok:'+q.transaction_id);payAch(e,news,now);accPut(store,ac,x);
+  return {err:false,body:'<?xml version="1.0" encoding="UTF-8"?><callbacks_payment_response xmlns="http://api.forticom.com/1.0/">true</callbacks_payment_response>'};}
+
+
+;
 // Request handling for the friends' table, independent of where rooms are stored and how messages travel.
 // store: {load(code) -> {room,ver}|null, save(room,ver) -> bool (false if someone changed it meanwhile), create(room) -> bool}
 // Every change is: load, change, save-if-unchanged; on a clash the whole step is simply repeated.
 
 function rndSecure(){try{const b=require('crypto').randomBytes(4);return b.readUInt32LE(0)/4294967296;}catch(e){return Math.random();}}
-const OPS=new Set(['create','join','poll','act','cfg','start','say','leave','tick','quick','me','top']);
+const ECO_OPS=new Set(['prof','buy','equip','gift','giftx2','adcoins','dalt','bail']);
+const OPS=new Set(['create','join','poll','act','cfg','start','say','leave','tick','quick','me','top','solo','winx2','iap',...ECO_OPS]);
 // open tables that still wait for people, by kind (tier|mode|players); only a hint, every table is checked on load
 const OPEN=new Map();
 function openAdd(key,code){if(!OPEN.has(key))OPEN.set(key,[]);OPEN.get(key).push(code);}
@@ -655,19 +1104,23 @@ async function handle(store,req,now){
   now=now||Date.now();const op=String(req.op||'');
   if(!OPS.has(op))return {err:'bad op'};
   if(!store.acc)store.acc=new Map();
-  const ac=cleanAcct(req.acct);
+  const ac=resolveAcct(store,req);
   if(op==='me'){if(!ac)return {err:'bad acct'};const x=accGet(store,ac,now);return {me:profile(x),tiers:TIERS,now};}
   if(op==='top')return Object.assign(topLists(store,now,ac),{now});
   if(op==='quick')return quickJoin(store,req,ac,now);
+  if(op==='solo'){if(!ac)return {err:'bad acct'};return soloStart(store,req,ac,now);}
+  if(op==='iap'){if(!ac)return {err:'bad acct'};return Object.assign(iapClaim(store,ac,req,now),{now});}
+  if(op==='winx2'){if(!ac)return {err:'bad acct'};return Object.assign(winDouble(store,ac,req,now),{now});}
+  if(ECO_OPS.has(op)){if(!ac)return {err:'bad acct'};return Object.assign(ecoOp(store,ac,req,now),{now});}
   if(op==='create'){
-    for(let k=0;k<8;k++){const r=newRoom(req.opts,req.name,now,rndSecure);
+    for(let k=0;k<8;k++){const r=newRoom(req.opts,req.name,now,rndSecure,ac);
       if(await store.create(r.room))return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now});}
     return {err:'busy'};}
   const code=normCode(req.code);if(!code)return {err:'bad code'};
   for(let attempt=0;attempt<6;attempt++){
     const rec=await store.load(code);if(!rec||rec.room.st==='closed'||rec.room.exp<now)return {err:'no room'};
     const room=rec.room,v0=room.v,l0=room.log.length,c0=room.ci;let err=null,seat=seatOf(room,req.tok),tok=req.tok;
-    if(op==='tick'){advance(room,now,rndSecure);rateQuick(store,room,now);if(room.q&&room.st!=='lobby')openDrop(room.q.key,room.code);
+    if(op==='tick'){advance(room,now,rndSecure);rateQuick(store,room,now);settleSolo(store,room,now);settleNet(store,room,now);if(room.q&&room.st!=='lobby')openDrop(room.q.key,room.code);
       if(room.v!==v0&&!(await store.save(room,rec.ver)))continue;return {room:{code:room.code},due:nextDue(room),_l0:l0,_c0:c0,now};}
     if(op==='join'){const r=join(room,req.name,now,rndSecure,req.tok,ac);if(r.err)return {err:r.err};seat=r.seat;tok=r.tok;}
     else{if(seat<0)return {err:'not seated'};const s=room.seats[seat];
@@ -676,8 +1129,9 @@ async function handle(store,req,now){
     else if(op==='cfg')err=configure(room,tok,req.ch||{});
     else if(op==='start')err=start(room,tok,now,rndSecure);
     else if(op==='say')err=say(room,tok,req.k,now);
-    else if(op==='leave')err=leave(room,tok,now);
-    advance(room,now,rndSecure);rateQuick(store,room,now);if(room.q&&room.st!=='lobby')openDrop(room.q.key,room.code);
+    else if(op==='leave'){if(room.solo)soloLeave(store,room,now);
+      else{const s=room.seats[seat];if(room.q&&room.st==='lobby'&&s&&s.ac&&s.paid){stakeBack(store,s.ac,s.paid,now);s.paid=0;}err=leave(room,tok,now);}}
+    advance(room,now,rndSecure);rateQuick(store,room,now);settleSolo(store,room,now);settleNet(store,room,now);if(room.q&&room.st!=='lobby')openDrop(room.q.key,room.code);
     room.exp=now+ROOM_TTL;
     if(room.v!==v0||op==='join'){if(!(await store.save(room,rec.ver)))continue;}
     const since=req.since==null?-1:+req.since;
@@ -692,6 +1146,7 @@ async function handle(store,req,now){
 async function quickJoin(store,req,ac,now){
   if(!ac)return {err:'bad acct'};const t=tierOf(req.tier);if(!t)return {err:'bad tier'};
   const me=accGet(store,ac,now);if(me.r<t.need)return {err:'rank',need:t.need};
+  if(ecoOf(me).coins<t.stake)return {err:'coins',need:t.stake};
   const o=quickOpts(t,req.mode,req.n),key=quickKey(t.id,o.mode,o.n);me.nm=cleanName(req.name);accPut(store,ac,me);
   const list=(OPEN.get(key)||[]).slice();
   for(const code of list){
@@ -701,12 +1156,13 @@ async function quickJoin(store,req,ac,now){
       // the same person twice at one table is not a game
       if(room.seats.some(s=>s.k==='h'&&s.ac===ac)){openDrop(key,code);break;}
       const r=join(room,req.name,now,rndSecure,'',ac);if(r.err){openDrop(key,code);break;}
-      room.exp=now+ROOM_TTL;
+      room.exp=now+ROOM_TTL;room.seats[r.seat].paid=t.stake;
       if(!(await store.save(room,rec.ver)))continue;
+      if(!stakeTake(store,ac,t.stake,now)){/* spent meanwhile: give the seat back */const rec2=await store.load(code);if(rec2){leave(rec2.room,r.tok,now);await store.save(rec2.room,rec2.ver);}return {err:'coins',need:t.stake};}
       if(!room.seats.some(s=>s.k==='o'))openDrop(key,code);
       return Object.assign({tok:r.tok,seat:r.seat},viewFor(room,r.seat,-1,0),{now,due:nextDue(room),_l0:0,_c0:0,_changed:true});}}
-  for(let k=0;k<8;k++){const r=newRoom(o,req.name,now,rndSecure,ac,{tier:t.id,stake:t.stake,key});
-    if(await store.create(r.room)){openAdd(key,r.room.code);return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now,due:nextDue(r.room)});}}
+  for(let k=0;k<8;k++){const r=newRoom(o,req.name,now,rndSecure,ac,{tier:t.id,stake:t.stake,key});r.room.seats[0].paid=t.stake;
+    if(await store.create(r.room)){if(!stakeTake(store,ac,t.stake,now)){r.room.st='closed';await store.save(r.room,1);return {err:'coins',need:t.stake};}openAdd(key,r.room.code);return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now,due:nextDue(r.room)});}}
   return {err:'busy'};}
 
 // an in-memory store for local testing
@@ -725,13 +1181,22 @@ function memStore(){const m=new Map();
 //  GET  /ws   — WebSocket: the same requests, plus everything that happens at the table is pushed at once
 // Rooms live in memory and are saved to disk every few seconds, so a restart loses nothing.
 const http=require('http'),fs=require('fs'),crypto=require('crypto'),path=require('path');
-const core=typeof handle==='function'?{handle,memStore,viewFor}:require('./dist/core.js');
+const core=typeof handle==='function'?{handle,memStore,viewFor,vkNotify,okNotify}:require('./dist/core.js');
 const PORT=+process.env.PORT||8080,DATA=process.env.DATA||'/var/lib/durak/rooms.json',STATIC=process.env.STATIC||'';
 
 /* ---------- rooms: in memory, saved to disk ---------- */
 const store=core.memStore();let dirty=false,accDirty=false;
 const ACC=path.join(path.dirname(DATA),'accounts.json');
-try{store.acc=new Map(JSON.parse(fs.readFileSync(ACC,'utf8')));console.log('loaded accounts',store.acc.size);}catch(e){store.acc=new Map();}
+store.iapUsed=new Map();
+try{const raw=JSON.parse(fs.readFileSync(ACC,'utf8'));
+  if(Array.isArray(raw))store.acc=new Map(raw);else{store.acc=new Map(raw.a||[]);store.iapUsed=new Map(raw.u||[]);}
+  console.log('loaded accounts',store.acc.size,'purchases',store.iapUsed.size);}catch(e){store.acc=new Map();}
+/* secrets (platform keys) are not in the code: they are typed into the machine's metadata, key "durak-secrets", as JSON */
+store.secrets={};
+function loadSecrets(){require('http').get({host:'169.254.169.254',path:'/computeMetadata/v1/instance/attributes/durak-secrets',headers:{'Metadata-Flavor':'Google'},timeout:3000},res=>{
+  let b='';res.setEncoding('utf8');res.on('data',d=>b+=d);res.on('end',()=>{if(res.statusCode!==200)return;try{store.secrets=JSON.parse(b);console.log('secrets loaded:',Object.keys(store.secrets).join(','));}catch(e){console.error('secrets: not JSON');}});})
+  .on('error',()=>{}).on('timeout',function(){this.destroy();});}
+if(process.env.SECRETS){try{store.secrets=JSON.parse(process.env.SECRETS);}catch(e){}}else{loadSecrets();setInterval(loadSecrets,10*60*1000);}
 store.accDirty=()=>{accDirty=true;};
 try{const raw=JSON.parse(fs.readFileSync(DATA,'utf8'));const now=Date.now();
   for(const [code,rec] of raw){const r=JSON.parse(rec.d);if(r.exp>now){r.cx={};rec.d=JSON.stringify(r);store._m.set(code,rec);}}
@@ -740,7 +1205,7 @@ const save0=store.save,create0=store.create;
 store.save=async(r,v)=>{const ok=await save0(r,v);if(ok)dirty=true;return ok;};
 store.create=async r=>{const ok=await create0(r);if(ok)dirty=true;return ok;};
 function persistAcc(){if(!accDirty)return;accDirty=false;
-  try{fs.mkdirSync(path.dirname(ACC),{recursive:true});fs.writeFileSync(ACC+'.tmp',JSON.stringify([...store.acc]));fs.renameSync(ACC+'.tmp',ACC);}catch(e){console.error('acc save failed',e.message);}}
+  try{fs.mkdirSync(path.dirname(ACC),{recursive:true});fs.writeFileSync(ACC+'.tmp',JSON.stringify({a:[...store.acc],u:[...store.iapUsed]}));fs.renameSync(ACC+'.tmp',ACC);}catch(e){console.error('acc save failed',e.message);}}
 setInterval(persistAcc,5000);
 function persist(){if(!dirty)return;dirty=false;const now=Date.now();
   for(const [code,rec] of store._m){try{if(JSON.parse(rec.d).exp<now){store._m.delete(code);conns.delete(code);}}catch(e){store._m.delete(code);}}
@@ -805,6 +1270,14 @@ const handle0=core.handle;core.handle=async(st,req)=>{const c=req.code?String(re
 const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'POST, GET, OPTIONS'};
 const server=http.createServer((rq,rs)=>{
   if(rq.method==='OPTIONS'){rs.writeHead(204,CORS);rs.end();return;}
+  // payment notifications: VK posts a form, OK asks with GET
+  if(rq.url.split('?')[0]==='/vkpay'){
+    if(rq.method==='POST'){let b='';rq.on('data',d=>{b+=d;if(b.length>65536)rq.destroy();});
+      rq.on('end',()=>{let out;try{out=core.vkNotify(store,Object.fromEntries(new URLSearchParams(b)),Date.now());}catch(e){console.error(e);out={error:{error_code:1,error_msg:'server error',critical:false}};}
+        rs.writeHead(200,{'Content-Type':'application/json; charset=utf-8'});rs.end(JSON.stringify(out));});return;}
+    const q=Object.fromEntries(new URL(rq.url,'http://x').searchParams);delete q.ok;let out;
+    try{out=core.okNotify(store,q,Date.now());}catch(e){console.error(e);out={err:true,code:9999,body:'<error/>'};}
+    const hd={'Content-Type':'application/xml; charset=utf-8'};if(out.err)hd['invocation-error']=String(out.code);rs.writeHead(200,hd);rs.end(out.body);return;}
   if(rq.url==='/health'){rs.writeHead(200,Object.assign({'Content-Type':'text/plain'},CORS));rs.end('ok '+store._m.size);return;}
   if(rq.method==='POST'&&rq.url.split('?')[0]==='/api'){let b='';let big=false;
     rq.on('data',d=>{b+=d;if(b.length>65536){big=true;rq.destroy();}});

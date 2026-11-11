@@ -571,7 +571,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   var PRICES={noads:[35,249],starter:[21,149],boyar:[57,399],coins3000:[14,99],coins10000:[35,249]};
   function votes(n){var a=n%10,b=n%100;return n+' '+(a===1&&b!==11?'голос':a>=2&&a<=4&&(b<12||b>14)?'голоса':'голосов');}
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794416611';document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794426415';document.body.appendChild(s);}
   var fallback=setTimeout(function(){log('bridge timeout');boot(null);},8000);
   if(!B){clearTimeout(fallback);boot(null);return;}
   function send(m,p){return B.send(m,p||{});}
@@ -591,12 +591,12 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   function make(name){
     var products=Object.keys(PRICES).map(function(id){return {id:id,price:PRICES[id][OK?1:0]};});
     // digital goods are not sold inside the VK app on iPhone; ads still work there
-    var store=IOS?null:{products:function(){return products;},owned:function(){return [];},pending:function(){return [];},
+    var store=IOS?null:{products:function(){return products;},earlier:function(){return [];},
       buy:function(id){return send('VKWebAppShowOrderBox',{type:'item',item:id}).then(function(r){
-          var ok=!!(r&&(r.success||r.status==='success'));return {ok:ok,purchaseId:ok?'vk'+(r.order_id||Date.now()):'',reason:ok?'':'CANCEL'};},
+          var ok=!!(r&&(r.success||r.status==='success'));return {ok:ok,byServer:ok,reason:ok?'':'CANCEL'};},
         function(e){log('order',JSON.stringify(e));return {ok:false,reason:'CANCEL'};});},
       consume:function(){return Promise.resolve();}};
-    return {kind:OK?'ok':'vk',store:store,userName:name||'',
+    return {kind:OK?'ok':'vk',store:store,userName:name||'',lp:location.search.slice(1),
       fmt:function(p){return OK?p+' ОК':votes(p);},
       startCode:(location.hash.match(/t=([^&]+)/)||[])[1]?decodeURIComponent(location.hash.match(/t=([^&]+)/)[1]):'',
       shareLink:function(code){return APP&&!OK?'https://vk.com/app'+APP+'#t='+encodeURIComponent(code):'https://ttgms.github.io/durak/?t='+encodeURIComponent(code);},
