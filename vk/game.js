@@ -989,10 +989,13 @@ function dailyTaskFor(d,alt){let h=7;for(const ch of d)h=(h*31+ch.charCodeAt(0))
   if(players>2)pool.push('first');else pool.push('fast'+(big?34:14));
   const goal=pool[Math.floor(r()*pool.length)];return {mode,deck,players,goal};}
 function freshEco(){return {coins:0,owned:['gzhel','sukno','classic'],back:'gzhel',face:'classic',tableSkin:'sukno',
-  camp:{},daily:{day:'',done:false},gift:{day:'',streak:0},ach:{},iap:{},iapDone:{},
+  camp:{},daily:{day:'',done:false},gift:{day:'',streak:0},ach:{},iap:{},iapDone:{},xp:0,lvl:1,
   st:{games:0,wins:0,losses:0,draws:0,streak:0,bestStreak:0,pogGiven:0,pogGot:0,noTakeWins:0,transfers:0,takes:0,firstOuts:0,bigWins:0,sixWins:0,win54:0,dailyCount:0,coinsEarned:0,
       byMode:{podkidnoy:{g:0,w:0},perevodnoy:{g:0,w:0}},byDeck:{36:{g:0,w:0},54:{g:0,w:0}},byPlayers:{}}};}
-const ECO_KEYS=['coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail'];
+const ECO_KEYS=['xp','lvl','coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail'];
+// levels grow with every game played and never go down; a new level brings coins
+function xpFor(L){return 25*(L-1)*L;} // experience needed to reach level L: 50, 150, 300, 500…
+const LEVEL_COINS=L=>50*L;
 function campStars(camp){let n=0;for(const k in camp)n+=camp[k].stars.reduce((a,b)=>a+b,0);return n;}
 function campRec(camp,l,i){return camp[l+'.'+i]||{won:false,stars:[0,0,0]};}
 function campLocDone(camp,li){return campRec(camp,LOCS[li].id,LOCS[li].stages.length-1).won;}
@@ -1013,7 +1016,7 @@ function levelPool(level,camp){const L=LEVELS[level]||LEVELS.medium;let pool=[];
   if(level==='hard'&&campRec(camp,'palace',2).won)pool.unshift('tsar');
   return pool;}
 
-if(typeof module!=='undefined')module.exports={CHEST_COINS,CAUGHT_COINS,stageReward,POOLS,LEVELS,quickReward,levelPool,LOCS,SHOP,GIFTS,ACH,GOALS,goalMet,DAILY_REWARD,STARS_MAX,dayOf,prevDayOf,dailyTaskFor,freshEco,ECO_KEYS,campStars,campRec,achDue,shopItem};
+if(typeof module!=='undefined')module.exports={xpFor,LEVEL_COINS,CHEST_COINS,CAUGHT_COINS,stageReward,POOLS,LEVELS,quickReward,levelPool,LOCS,SHOP,GIFTS,ACH,GOALS,goalMet,DAILY_REWARD,STARS_MAX,dayOf,prevDayOf,dailyTaskFor,freshEco,ECO_KEYS,campStars,campRec,achDue,shopItem};
 
 // The player's save. The rules it follows (shop, goals, achievements, tasks) are in rules.js, shared with the server.
 /* ---------- save ---------- */
@@ -1206,7 +1209,9 @@ function checkAch(){} // the server pays achievements and says so (applyEco)
 /* ---------- home ---------- */
 function renderFan(){setFaceStyle(save.face);$('fan').innerHTML=[['Д','h',-22],['К','s',0],['Т','d',22]].map(([r,su,a],i)=>`<div class="fc" style="transform:rotate(${a}deg);animation-delay:${i*.08}s">${faceSVG({r,s:su})}</div>`).join('');}
 renderFan();$('table').insertAdjacentHTML('afterbegin',TDECO_HTML);
-function renderHome(){if($('hArenaRank'))$('hArenaRank').textContent=save.arenaRank||'';const st=starsTotal(),cur=LOCS.findIndex((l,i)=>!locDone(i));
+function renderHome(){if($('hArenaRank'))$('hArenaRank').innerHTML=save.arenaRank?(save.arenaRi!=null?rankBadge(save.arenaRi,18):'')+save.arenaRank:'';
+  if($('homeLvl')){const L=save.lvl||1,a=xpFor(L),b=xpFor(L+1),pc=Math.max(0,Math.min(100,Math.round(((save.xp||0)-a)/(b-a)*100)));
+    $('homeLvl').innerHTML=`<b>${L}</b><span>уровень</span><i style="--p:${pc}%"></i>`;$('homeLvl').title=`Опыт: ${save.xp||0} из ${b}`;}const st=starsTotal(),cur=LOCS.findIndex((l,i)=>!locDone(i));
   $('homeProg').textContent=`Звёзд в походе: ${st} из ${STARS_MAX}`+(cur<0?' · Поход пройден!':` · Сейчас: ${LOCS[cur].name}`);
   renderDaily();checkGift();}
 function renderDaily(){const d=dailyTask(),done=dailyDone(),b=$('hDaily');
@@ -1991,8 +1996,29 @@ $('lStart').onclick=()=>{audio();netCall('start');};
 // the game's own private id for this player; it lives in the save, so it follows the player wherever the save goes
 function myAcct(){if(!save.acct){let a='';try{const b=new Uint8Array(16);crypto.getRandomValues(b);b.forEach(x=>a+='abcdefghijkmnpqrstuvwxyz23456789'[x&31]);}catch(e){for(let i=0;i<20;i++)a+='abcdefghijkmnpqrstuvwxyz23456789'[Math.floor(Math.random()*32)];}
   save.acct=a+'x'.repeat(Math.max(0,16-a.length));persist();}return save.acct;}
-const ARENA_TIERS=[{id:'fair',nm:'Ярмарка',stake:100,need:0},{id:'merch',nm:'Купеческий',stake:1000,need:300},{id:'boyar',nm:'Боярский',stake:10000,need:1000},{id:'tsar',nm:'Царский',stake:50000,need:2500}];
-const ARENA_TITLES=[[0,'Новичок'],[300,'Купец'],[1000,'Боярин'],[2500,'Царь']];
+const ARENA_TIERS=[{id:'fair',nm:'Ярмарка',stake:100,need:0},{id:'merch',nm:'Купеческий',stake:1000,need:500},{id:'boyar',nm:'Боярский',stake:10000,need:1200},{id:'tsar',nm:'Царский',stake:50000,need:2600}];
+const ARENA_TITLES=[[0,'Новичок'],[100,'Подмастерье'],[250,'Мастер'],[500,'Купец'],[800,'Гость торговый'],[1200,'Боярин'],[1800,'Воевода'],[2600,'Князь'],[3600,'Великий князь'],[5000,'Царь']];
+// a badge for every rank: the shield goes from wood to bronze, silver, gold and royal red; the sign on it grows
+function rankBadge(i,size){i=Math.max(0,Math.min(9,i|0));size=size||40;
+  const M=[['#8a5a32','#5c3518','#c08a55'],['#8a5a32','#5c3518','#c08a55'],['#c07a3a','#7a4313','#f0b57a'],['#c07a3a','#7a4313','#f0b57a'],
+    ['#b9c3cf','#6d7886','#f2f5f8'],['#b9c3cf','#6d7886','#f2f5f8'],['#f0c050','#a8701c','#fff1b8'],['#f0c050','#a8701c','#fff1b8'],['#7a3fa8','#3f1a63','#e0b0ff'],['#c8322a','#6e120d','#ffcf6a']][i];
+  const star=(x,y,r)=>{let d='';for(let k=0;k<10;k++){const a=-Math.PI/2+k*Math.PI/5,rr=k%2?r*.45:r;d+=(k?'L':'M')+(x+Math.cos(a)*rr).toFixed(1)+' '+(y+Math.sin(a)*rr).toFixed(1);}return `<path d="${d}Z" fill="#fff6d8" stroke="${M[1]}" stroke-width=".8"/>`;};
+  const crown=(y,w)=>`<path d="M${24-w} ${y+7}l-1.2-9 ${w*.55} 4.6L24 ${y-4}l${w*.45} 6.6 ${w*.55}-4.6-1.2 9z" fill="#ffd34d" stroke="#8a5a14" stroke-width="1"/><circle cx="24" cy="${y-4.6}" r="1.4" fill="#e23b2e"/>`;
+  let sign='';
+  if(i<=2)sign=[star(24,27,7)].concat(i>=1?[star(16.5,30,4.5),star(31.5,30,4.5)]:[]).slice(0,i===0?1:3).join('')+(i===1?'':'');
+  if(i===1)sign=star(19,28,6)+star(29,28,6);
+  if(i===3||i===4)sign=`<circle cx="24" cy="27" r="8.5" fill="#ffd34d" stroke="#8a5a14" stroke-width="1.2"/><path d="M20.5 29.5l-.6-5 2.3 1.9L24 22.8l1.8 3.6 2.3-1.9-.6 5z" fill="#a8701c"/>`+(i===4?star(24,13,4):'');
+  if(i===5)sign=`<path d="M15 31c0-7 4-11 9-11s9 4 9 11z" fill="#9b2d24"/><rect x="13.5" y="30" width="21" height="4.5" rx="2" fill="#e8dcc4"/><circle cx="24" cy="19.5" r="2" fill="#ffd34d"/>`;
+  if(i===6)sign=`<path d="M16 34L31 17M32 34L17 17" stroke="#f2f5f8" stroke-width="3" stroke-linecap="round"/><path d="M14 31l4 4M34 31l-4 4" stroke="#8a5a14" stroke-width="3" stroke-linecap="round"/>`;
+  if(i===7)sign=crown(28,9);
+  if(i===8)sign=crown(29,9)+star(24,14,4.5);
+  if(i===9)sign=crown(28,11)+`<circle cx="18" cy="31" r="1.3" fill="#3fa9f5"/><circle cx="30" cy="31" r="1.3" fill="#3fa9f5"/>`;
+  const id='rb'+i+'_'+(++rankBadge.n); // its own fill: a copy on a hidden screen must not take the colours away
+  return `<svg class="rbadge" width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${M[2]}"/><stop offset=".45" stop-color="${M[0]}"/><stop offset="1" stop-color="${M[1]}"/></linearGradient></defs>
+    ${i>=8?`<circle cx="24" cy="24" r="22" fill="${M[0]}" opacity=".25"/>`:''}<path d="M24 3l17 6v12c0 11-7.5 19-17 24C14.5 40 7 32 7 21V9z" fill="url(#${id})" stroke="${M[1]}" stroke-width="2"/>
+    <path d="M24 7l13 4.6V21c0 8.6-5.6 15-13 19-7.4-4-13-10.4-13-19v-9.4z" fill="none" stroke="${M[2]}" stroke-opacity=".7" stroke-width="1.2"/>${sign}</svg>`;}
+rankBadge.n=0;
+function rankIndex(r){let k=0;ARENA_TITLES.forEach((t,i)=>{if(r>=t[0])k=i;});return k;}
 const BAIL=500;
 let arenaMe=null;
 if(!save.arena)save.arena={mode:'podkidnoy',n:2};if(!save.qPaid)save.qPaid={};if(!save.qDone)save.qDone={};
@@ -2009,13 +2035,13 @@ function renderArena(){
   const r=arenaMe?arenaMe.r:0,n=save.arena.n;
   $('aTiers').innerHTML=ARENA_TIERS.map(t=>{const lock=r<t.need;
     return `<div class="panel tier${lock?' lock':''}"><h4>${t.nm}</h4><span class="st">Ставка <b>${fmtNum(t.stake)}</b></span><span class="st">Победа: <b>+${fmtNum(bestWin(t.stake,n))}</b></span>
-      ${lock?`<span class="lk">🔒 Со звания «${titleOf(t.need)}»</span>`:`<button class="gold" type="button" data-t="${t.id}">Играть</button>`}</div>`;}).join('');
+      ${lock?`<span class="lk">🔒 Со звания ${rankBadge(rankIndex(t.need),18)} «${titleOf(t.need)}»</span>`:`<button class="gold" type="button" data-t="${t.id}">Играть</button>`}</div>`;}).join('');
   $('aTiers').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{audio();arenaPlay(b.dataset.t);});
   if(!NET_API){$('aMsg').textContent='Онлайн-столы скоро заработают.';return;}
-  netReq('me',{acct:myAcct()}).then(v=>{if(v&&v.me){arenaMe=v.me;save.arenaRank=v.me.rank;persist();if(!$('arena').hidden){renderArenaMe();
+  netReq('me',{acct:myAcct()}).then(v=>{if(v&&v.me){arenaMe=v.me;save.arenaRank=v.me.rank;save.arenaRi=v.me.ri;persist();if(!$('arena').hidden){renderArenaMe();
     $('aTiers').querySelectorAll('.tier').forEach((el,i)=>{const t=ARENA_TIERS[i];if(el.classList.contains('lock')!==(arenaMe.r<t.need))renderArena();});}}});}
-function renderArenaMe(){const m=arenaMe||{r:0,rank:'Новичок',next:{at:300,nm:'Купец'},wp:0};
-  $('aRank').textContent=m.rank;$('aPts').textContent=fmtNum(m.r);
+function renderArenaMe(){const m=arenaMe||{r:0,rank:'Новичок',next:{at:100,nm:'Подмастерье'},wp:0};
+  $('aRank').innerHTML=rankBadge(rankIndex(m.r),44)+'<span>'+m.rank+'</span>';$('aPts').textContent=fmtNum(m.r);
   const prev=[...ARENA_TITLES].reverse().find(k=>m.r>=k[0])[0];
   $('aBar').style.width=(m.next?Math.min(100,Math.round((m.r-prev)/(m.next.at-prev)*100)):100)+'%';
   $('aNext').textContent=m.next?`До звания «${m.next.nm}»: ${fmtNum(m.next.at-m.r)}`:'Высшее звание';}
@@ -2046,7 +2072,7 @@ function openTop(){modal('topM',true);$('topList').innerHTML='<div class="empty"
   netReq('top',{acct:myAcct()}).then(v=>{if(!v||v.err||!v.week){$('topList').innerHTML='<div class="empty">Не получилось загрузить рейтинг.</div>';return;}renderTop(v);});}
 function renderTop(v){segButtons($('topTabs'),[['week','Неделя'],['ever','Всё время']],topTab,x=>{topTab=x;renderTop(v);});
   const list=v[topTab],key=topTab==='week'?'wp':'r';
-  $('topList').innerHTML=list.length?list.map((x,i)=>`<div class="${x.me?'me':''}"><span class="n">${i+1}</span><span>${esc(x.nm)} <small>${x.rank}</small></span><b>${fmtNum(x[key])}</b></div>`).join(''):'<div class="empty">Пока никого. Сыграйте первым!</div>';
+  $('topList').innerHTML=list.length?list.map((x,i)=>`<div class="${x.me?'me':''}"><span class="n">${i+1}</span><span class="who">${rankBadge(x.ri>=0?x.ri:rankIndex(x.r),26)}<span>${esc(x.nm)} <small>${x.rank}${x.lvl?' · ур. '+x.lvl:''}</small></span></span><b>${fmtNum(x[key])}</b></div>`).join(''):'<div class="empty">Пока никого. Сыграйте первым!</div>';
   const place=topTab==='week'?v.myWeek:v.myEver;
   $('topMe').textContent=place?`Ваше место: ${place}`:topTab==='week'?'Победите за онлайн-столом, чтобы попасть в рейтинг недели.':'Сыграйте за онлайн-столом, чтобы попасть в рейтинг.';}
 
@@ -2060,9 +2086,10 @@ function api(op,data){if(!NET_API)return Promise.resolve({err:'offline'});
 function applyEco(v){if(!v||!v.eco)return v;
   for(const k of ECO_KEYS){if(v.eco[k]!==undefined)save[k]=v.eco[k];else if(k!=='coins')delete save[k];}
   if(v.now)window.__skew=v.now-Date.now();
-  if(v.me){arenaMe=v.me;save.arenaRank=v.me.rank;}
+  if(v.me){arenaMe=v.me;save.arenaRank=v.me.rank;save.arenaRi=v.me.ri;}
   ecoReady=true;persist();refreshCoins();applySkin();
-  for(const n of v.news||[])if(n.t==='ach')toast('Достижение: '+n.name,n.d+' · +'+n.c+' монет');
+  for(const n of v.news||[]){if(n.t==='ach')toast('Достижение: '+n.name,n.d+' · +'+n.c+' монет');if(n.t==='lvl')toast('Новый уровень: '+n.lvl+'!','+'+n.c+' монет');}
+  if(!$('home').hidden)renderHome();
   return v;}
 function ecoCall(op,data){return api(op,data).then(v=>{applyEco(v);if(v&&v.err==='net')gToast('Нет связи с сервером');return v;});}
 // first contact: an old save from the browser is offered once, the server keeps what is believable
@@ -2091,15 +2118,18 @@ if(NET_API)ecoLoad();
 // window.__PF is set by the platform page before the game starts; the plain site has none, and all of this stays hidden.
 const PF=window.__PF||null;
 if(!save.iap)save.iap={};if(!save.iapDone)save.iapDone={};
+// coins come first: they are what stakes at the online tables are made of
 const IAP=[
-  {id:'boyar',name:'Боярский пакет',d:'Навсегда без рекламы, монеты за победы ×2 и рубашка «Боярская», которой больше нигде нет',big:true},
-  {id:'noads',name:'Без рекламы',d:'Навсегда убирает рекламу между партиями. Реклама за награду остаётся по желанию'},
+  {id:'coins3000',name:'Мешок монет',d:'3 000 монет — 3 партии за Купеческим столом'},
+  {id:'coins10000',name:'Царская казна',d:'10 000 монет — ставка за Боярским столом'},
+  {id:'coins30000',name:'Сундук золота',d:'30 000 монет — для крупных ставок'},
+  {id:'coins100000',name:'Царская сокровищница',d:'100 000 монет — хватит на Царский стол',big:true},
+  {id:'boyar',name:'Боярский пакет',d:'Монеты за победы над ботами ×2, без рекламы и рубашка «Боярская», которой больше нигде нет',big:true},
   {id:'starter',name:'Стартовый набор',d:'2 000 монет, рубашка «Городец» и колода «Русская»'},
-  {id:'coins3000',name:'Мешок монет',d:'3 000 монет'},
-  {id:'coins10000',name:'Царская казна',d:'10 000 монет — больше всего монет за рубль'}];
+  {id:'noads',name:'Без рекламы',d:'Навсегда убирает рекламу между партиями. Реклама за награду остаётся по желанию'}];
 // prices are roubles on most platforms; VK and OK sell for their own votes
 const fmtP=p=>PF&&PF.fmt?PF.fmt(p):p+' ₽';
-const COINS_OF={coins3000:3000,coins10000:10000};
+const COINS_OF={coins3000:3000,coins10000:10000,coins30000:30000,coins100000:100000};
 // purchases are given by the server (it checks them with the platform), never here
 const noAds=()=>!!(save.iap&&(save.iap.noads||save.iap.boyar));
 // coins for watching ads are not offered in VK and OK (there people pay with votes); the hint for an ad stays everywhere
@@ -2131,7 +2161,8 @@ if(PF){$('tbIap').hidden=false;$('tbIap').onclick=()=>{shopTab='iap';renderShop(
 // the bar on the main menu sells one thing at a time, the most tempting one this player does not have yet,
 // and quietly turns to the next offer every few seconds
 const BAR_OFFERS=[
-  {id:'noads',ic:'🚫',t:'Играйте без рекламы',sub:p=>`Навсегда — всего за ${fmtP(p)}`,skip:()=>noAds()},
+  {id:'noads',ic:'🚫',t:'Играйте без рекламы',sub:p=>`Навсегда — всего за ${fmtP(p)}`,skip:()=>noAds()||!AD_GIFTS},
+  {id:'coins30000',ic:'🧰',t:'Сундук золота',sub:p=>`30 000 монет на ставки — ${fmtP(p)}`,skip:()=>false},
   {id:'starter',ic:'🎒',t:'Стартовый набор',sub:p=>`2 000 монет, рубашка и колода — ${fmtP(p)}`,skip:()=>!!save.iap.starter},
   {id:'boyar',ic:'👑',t:'Боярский пакет',sub:p=>`Без рекламы, монеты ×2 и особая рубашка — ${fmtP(p)}`,skip:()=>!!save.iap.boyar},
   {id:'coins10000',ic:'💰',t:'Царская казна',sub:p=>`10 000 монет — ${fmtP(p)}`,skip:()=>false}];
@@ -2155,9 +2186,10 @@ renderShop=function(){
   if(AD_GIFTS&&(rewardedOk||adCoinsLeft()>0)){const left=adCoinsLeft();
     h+=`<div class="panel item iap ad"><div class="iapic">🎁</div><h4>Монеты за рекламу</h4><div class="d">+${AD_COINS} монет за короткий ролик</div><div class="how">Осталось сегодня: ${left} из ${AD_COINS_DAY}</div>
       <button class="gold" id="adCoins" type="button" ${left<=0||!rewardedOk?'disabled':''}>Смотреть</button></div>`;}
-  for(const it of IAP){const pr=price(it.id),have=!COINS_OF[it.id]&&save.iap[it.id];
+  for(const it of IAP){if(it.id==='noads'&&!AD_GIFTS)continue;const pr=price(it.id),have=!COINS_OF[it.id]&&save.iap[it.id];
+    if(pr==null&&(it.id==='coins30000'||it.id==='coins100000'))continue; // a pack this platform does not sell yet
     const bought=have||(it.id==='noads'&&save.iap.boyar);
-    h+=`<div class="panel item iap${it.big?' big':''}"><div class="iapic">${it.id==='boyar'?backSVG('boyar'):it.id==='noads'?'🚫':it.id==='starter'?'🎒':'💰'}</div><h4>${it.name}</h4><div class="d">${it.d}</div>
+    h+=`<div class="panel item iap${it.big?' big':''}"><div class="iapic">${it.id==='boyar'?backSVG('boyar'):it.id==='noads'?'🚫':it.id==='starter'?'🎒':it.id==='coins100000'?'👑':it.id==='coins30000'?'🧰':'💰'}</div><h4>${it.name}</h4><div class="d">${it.d}</div>
       ${bought?'<div class="sel">✓ Куплено</div>':pr==null?'<button class="gold" disabled type="button">Недоступно</button>':`<button class="gold" data-iap="${it.id}" type="button">${fmtP(pr)}</button>`}</div>`;}
   $('shopGrid').innerHTML=h;
   const ac0=$('adCoins');if(ac0)ac0.onclick=()=>{if(adCoinsLeft()<=0)return;ac0.disabled=true;rewarded().then(ok=>ok?ecoCall('adcoins'):null).then(v=>{if(v&&v.amount)coinSnd();checkRewarded();renderShop();});};
@@ -2206,5 +2238,8 @@ startGame=function(c){hintUsed=false;gamesHere++;
   if(!can){startGame0(c);refreshAdButtons();return;}
   lastFull=Date.now();withAd(()=>PF.fullscreen()).then(()=>{startGame0(c);refreshAdButtons();});};
 if(PF){checkRewarded();setInterval(checkRewarded,60000);if(PF.started)PF.started();}
+
+/* --- the coins at the top are a button: more coins are in the treasury (or, without one, the shop) --- */
+document.querySelectorAll('button.coins').forEach(b=>b.onclick=()=>{audio();shopTab=PF&&PF.store?'iap':'backs';show('shop');});
 
 })();

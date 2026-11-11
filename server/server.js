@@ -492,10 +492,13 @@ function dailyTaskFor(d,alt){let h=7;for(const ch of d)h=(h*31+ch.charCodeAt(0))
   if(players>2)pool.push('first');else pool.push('fast'+(big?34:14));
   const goal=pool[Math.floor(r()*pool.length)];return {mode,deck,players,goal};}
 function freshEco(){return {coins:0,owned:['gzhel','sukno','classic'],back:'gzhel',face:'classic',tableSkin:'sukno',
-  camp:{},daily:{day:'',done:false},gift:{day:'',streak:0},ach:{},iap:{},iapDone:{},
+  camp:{},daily:{day:'',done:false},gift:{day:'',streak:0},ach:{},iap:{},iapDone:{},xp:0,lvl:1,
   st:{games:0,wins:0,losses:0,draws:0,streak:0,bestStreak:0,pogGiven:0,pogGot:0,noTakeWins:0,transfers:0,takes:0,firstOuts:0,bigWins:0,sixWins:0,win54:0,dailyCount:0,coinsEarned:0,
       byMode:{podkidnoy:{g:0,w:0},perevodnoy:{g:0,w:0}},byDeck:{36:{g:0,w:0},54:{g:0,w:0}},byPlayers:{}}};}
-const ECO_KEYS=['coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail'];
+const ECO_KEYS=['xp','lvl','coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail'];
+// levels grow with every game played and never go down; a new level brings coins
+function xpFor(L){return 25*(L-1)*L;} // experience needed to reach level L: 50, 150, 300, 500…
+const LEVEL_COINS=L=>50*L;
 function campStars(camp){let n=0;for(const k in camp)n+=camp[k].stars.reduce((a,b)=>a+b,0);return n;}
 function campRec(camp,l,i){return camp[l+'.'+i]||{won:false,stars:[0,0,0]};}
 function campLocDone(camp,li){return campRec(camp,LOCS[li].id,LOCS[li].stages.length-1).won;}
@@ -792,10 +795,10 @@ const QUICK_WAIT=12000; // a table waits this long for people, then bots take th
 const RAKE=0.10;        // the table keeps a tenth of the pot, so coins do not pile up forever
 const TIERS=[
   {id:'fair', nm:'Ярмарка',    stake:100,   need:0,    level:'easy',   mult:1},
-  {id:'merch',nm:'Купеческий', stake:1000,  need:300,  level:'medium', mult:1.5},
-  {id:'boyar',nm:'Боярский',   stake:10000, need:1000, level:'hard',   mult:2},
-  {id:'tsar', nm:'Царский',    stake:50000, need:2500, level:'hard',   mult:3}];
-const TITLES=[[0,'Новичок'],[300,'Купец'],[1000,'Боярин'],[2500,'Царь']];
+  {id:'merch',nm:'Купеческий', stake:1000,  need:500,  level:'medium', mult:1.5},
+  {id:'boyar',nm:'Боярский',   stake:10000, need:1200, level:'hard',   mult:2},
+  {id:'tsar', nm:'Царский',    stake:50000, need:2600, level:'hard',   mult:3}];
+const TITLES=[[0,'Новичок'],[100,'Подмастерье'],[250,'Мастер'],[500,'Купец'],[800,'Гость торговый'],[1200,'Боярин'],[1800,'Воевода'],[2600,'Князь'],[3600,'Великий князь'],[5000,'Царь']];
 const PLACE_PTS={2:[20],3:[20,8],4:[20,10,5]},FOOL_PTS=-12,DRAW_PTS=3;
 const SHARE={2:[1],3:[.6,.4],4:[.5,.3,.2]};
 
@@ -822,7 +825,7 @@ function cleanAcct(a){a=String(a||'');return /^[a-z0-9]{16,40}$/.test(a)?a:'';}
 function accGet(store,a,now){let x=store.acc.get(a);if(!x){x={nm:'Игрок',r:0,g:0,w:0,wk:weekOf(now),wp:0,t:now};}
   if(x.wk!==weekOf(now)){x.wk=weekOf(now);x.wp=0;}return x;}
 function accPut(store,a,x){store.acc.set(a,x);if(store.accDirty)store.accDirty();}
-function profile(x){const nx=nextRank(x.r);return {r:x.r,rank:rankOf(x.r),next:nx,g:x.g,w:x.w,wp:x.wp};}
+function profile(x){const nx=nextRank(x.r);return {r:x.r,rank:rankOf(x.r),ri:TITLES.findIndex(k=>k[1]===rankOf(x.r)),next:nx,g:x.g,w:x.w,wp:x.wp};}
 // applied once per finished quick game
 function rateQuick(store,room,now){
   if(!room.q||!room.fin||room.fin.rated)return false;
@@ -834,7 +837,7 @@ function topLists(store,now,me){
   const wk=weekOf(now),all=[...store.acc.entries()].filter(([,x])=>x.g>0);
   const week=all.filter(([,x])=>x.wk===wk&&x.wp>0).sort((a,b)=>b[1].wp-a[1].wp);
   const ever=all.slice().sort((a,b)=>b[1].r-a[1].r);
-  const row=([a,x])=>({nm:x.nm,r:x.r,wp:x.wp,rank:rankOf(x.r),me:a===me||undefined});
+  const row=([a,x])=>({nm:x.nm,r:x.r,wp:x.wp,rank:rankOf(x.r),ri:TITLES.findIndex(k=>k[1]===rankOf(x.r)),lvl:x.eco?x.eco.lvl:1,me:a===me||undefined});
   return {week:week.slice(0,20).map(row),ever:ever.slice(0,20).map(row),
     myWeek:me?week.findIndex(([a])=>a===me)+1:0,myEver:me?ever.findIndex(([a])=>a===me)+1:0};}
 
@@ -851,6 +854,8 @@ function ecoOf(x){if(!x.eco){x.eco=freshEco();}return x.eco;}
 // what the browser gets: everything it needs to draw, nothing secret
 function ecoView(x,news){const e=ecoOf(x),o={};for(const k of ECO_KEYS)if(e[k]!==undefined)o[k]=e[k];
   return {eco:o,me:profile(x),news:news||[]};}
+function addXp(e,n,news){if(!e.lvl)e.lvl=1;e.xp=(e.xp||0)+n;
+  while(e.xp>=xpFor(e.lvl+1)){e.lvl++;const c=LEVEL_COINS(e.lvl);gain(e,c);news.push({t:'lvl',lvl:e.lvl,c});}}
 function gain(e,n){e.coins+=n;e.st.coinsEarned=(e.st.coinsEarned||0)+Math.max(0,n);}
 function own(e,id){if(!e.owned.includes(id))e.owned.push(id);}
 // achievements are checked after every change and paid at once
@@ -958,6 +963,7 @@ function settleSolo(store,room,now){
   if(r.caught){coins+=r.caught*CAUGHT_COINS;rw.push('Пойман шулер ×'+r.caught+': +'+r.caught*CAUGHT_COINS);}
   if(coins&&r.win&&e.iap&&e.iap.boyar){coins*=2;rw.push('Боярский пакет: монеты ×2');}
   if(coins){gain(e,coins);rw.unshift('+'+coins+' монет');}
+  const xp=10+(r.win?15:0);addXp(e,xp,news);rw.push('Опыт +'+xp);
   e.lastWin=r.win&&coins>0?{code:room.code,amount:coins}:null;
   if(e.live&&e.live.code===room.code)e.live=null;
   payAch(e,news,now);x.t=now;accPut(store,s.ac,x);
@@ -995,6 +1001,7 @@ function settleNet(store,room,now){
     if(r.chest){coins+=CHEST_COINS;rw.push('Клад +'+CHEST_COINS);}
     if(r.caught){coins+=r.caught*CAUGHT_COINS;rw.push('Пойман шулер ×'+r.caught+': +'+r.caught*CAUGHT_COINS);}
     if(coins){gain(e,coins);rw.unshift('+'+coins+' монет');}
+    const xp=15+(r.win?20:0);addXp(e,xp,news);rw.push('Опыт +'+xp);
     payAch(e,news,now);accPut(store,s.ac,x);out.push({coins,rw,news});});
   room.fin.seatRes=out;room.v++;return true;}
 // a seat at an open table costs the stake at once; leaving before the start gives it back
@@ -1008,8 +1015,8 @@ function stakeBack(store,ac,stake,now){const x=accGet(store,ac,now),e=ecoOf(x);e
 // Needs eco.js and quick.js in scope.
 const crypto_=typeof require==='function'?require('crypto'):null;
 
-const IAP_COINS={coins3000:3000,coins10000:10000};
-const IAP_IDS=new Set(['noads','starter','boyar','coins3000','coins10000']);
+const IAP_COINS={coins3000:3000,coins10000:10000,coins30000:30000,coins100000:100000};
+const IAP_IDS=new Set(['noads','starter','boyar','coins3000','coins10000','coins30000','coins100000']);
 // what a product gives; permanent ones once, coin packs once per purchase
 function iapGrant(e,id,pid){if(!IAP_IDS.has(id))return false;if(!e.iapDone)e.iapDone={};if(!e.iap)e.iap={};
   if(pid&&e.iapDone[pid])return false;
@@ -1058,7 +1065,7 @@ function resolveAcct(store,req){
 
 /* ---------- payment notifications from VK (POST, form) and OK (GET) ---------- */
 const VK_PRICES={noads:{t:'Без рекламы',vk:35,ok:249},starter:{t:'Стартовый набор',vk:21,ok:149},boyar:{t:'Боярский пакет',vk:57,ok:399},
-  coins3000:{t:'Мешок монет',vk:14,ok:99},coins10000:{t:'Царская казна',vk:35,ok:249}};
+  coins3000:{t:'Мешок монет',vk:14,ok:99},coins10000:{t:'Царская казна',vk:35,ok:249},coins30000:{t:'Сундук золота',vk:79,ok:549},coins100000:{t:'Царская сокровищница',vk:199,ok:1390}};
 const VK_PHOTO='https://ttgms.github.io/durak/vk/item.jpg';
 const md5=s=>crypto_.createHash('md5').update(s,'utf8').digest('hex');
 const sigOf=(p,secret)=>md5(Object.keys(p).filter(k=>k!=='sig').sort().map(k=>k+'='+p[k]).join('')+secret);

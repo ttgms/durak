@@ -123,6 +123,18 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .mscreen .topbar{position:sticky;top:0;left:auto;right:auto;width:100%;margin-top:-6px}
 .coins{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(#3b2414,#24150b);border:1.5px solid #c9952f;border-radius:999px;padding:4px 14px 4px 5px;font:800 16px var(--ui);color:#ffe2a0;font-variant-numeric:tabular-nums;box-shadow:inset 0 1px 0 rgba(255,220,150,.25),0 3px 10px rgba(0,0,0,.4);text-shadow:0 1px 0 #000}
 .coins .coin{width:24px;height:24px}
+.tleft{display:flex;gap:8px;align-items:center}
+.lvlPill{position:relative;display:inline-flex;align-items:baseline;gap:4px;padding:4px 12px 7px;border-radius:999px;background:rgba(0,0,0,.35);border:1px solid rgba(201,149,47,.6);color:#ffe2a0;font:700 12px var(--ui);overflow:hidden}
+.lvlPill b{font-size:16px}.lvlPill:empty{display:none}.lvlPill i{position:absolute;left:10px;right:10px;bottom:3px;height:3px;border-radius:2px;background:rgba(255,255,255,.15)}
+.lvlPill i::after{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--p);border-radius:2px;background:linear-gradient(90deg,#e6a828,#ffd77a)}
+.rbadge{flex:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));vertical-align:middle}
+#aRank{display:flex;align-items:center;gap:10px}
+#home nav .arena .live{display:inline-flex;align-items:center;gap:4px}
+.toplist .who{display:flex;align-items:center;gap:8px}
+.tier .lk .rbadge{vertical-align:-4px}
+button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:hover{filter:brightness(1.1)}button.coins:active{translate:0 1px}
+.cplus{display:grid;place-items:center;width:22px;height:22px;margin-left:3px;border-radius:50%;background:linear-gradient(#7fd36b,#3f9a34);color:#fff;font:900 17px/1 var(--ui);text-shadow:0 1px 0 rgba(0,0,0,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 1px 2px rgba(0,0,0,.4)}
+.coins.big .cplus{width:26px;height:26px;font-size:20px}
 .coins.big{font-size:20px;padding:5px 18px 5px 6px}.coins.big .coin{width:30px;height:30px}
 .coins.bump{animation:bump .5s}@keyframes bump{40%{transform:scale(1.15)}}
 .starsPill{display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.3);border:1px solid rgba(230,180,80,.4);border-radius:999px;padding:6px 13px;font:700 14px var(--ui);color:#ffd66e}
@@ -194,6 +206,10 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .node .nm{font-size:11.5px;font-weight:600;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:2.4em}
 .lockicon{font-size:12px;color:var(--paper-muted)}
 @media (max-width:520px){.loc .nodes{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-height:800px){#fan{transform:scale(.72);height:102px;margin:-14px 0 -12px}#home{gap:11px}#home .h1{font-size:clamp(36px,7vw,52px)}.ribbon{margin-top:6px}
+  #home nav{gap:8px}#home nav .mtile{padding:10px 10px}#home nav .gold{padding:11px 24px}.iapbar{padding:7px 12px}.daily{padding:8px 12px}}
+@media (max-height:800px) and (min-width:640px){#home nav{grid-template-columns:repeat(3,1fr);width:min(620px,100%)}#home nav .wide{grid-column:auto}#home nav .arena.wide{grid-column:span 2}#home nav .gold{font-size:16px;padding:10px 10px}
+  #home .iapbar,#home .dailywrap{width:min(620px,100%)}}
 @media (max-height:560px) and (min-width:600px){#fan{display:none}#home{gap:10px}#home nav{grid-template-columns:repeat(3,1fr);width:min(600px,100%)}#home nav .wide{grid-column:auto}#home nav .gold{font-size:16px;padding:12px 10px}.daily{width:min(600px,100%)}}
 /* quick game */
 .opts{display:flex;flex-direction:column;gap:14px;align-items:center;width:min(520px,100%)}
@@ -373,7 +389,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 
 <div id="home" class="screen mscreen center">
   <div class="hdeco" aria-hidden="true"><div class="band top"></div><div class="band bot"></div><div class="glow"></div></div>
-  <div class="topbar"><span class="starsPill" id="homeStars">★ 0</span><span class="coins big"><span class="coin">₽</span><span class="coinVal">0</span></span></div>
+  <div class="topbar"><span class="tleft"><span class="starsPill" id="homeStars">★ 0</span><span class="lvlPill" id="homeLvl"></span></span><button class="coins big" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
   <div id="fan" aria-hidden="true"></div>
   <header class="title"><h1 class="h1">Дурак</h1><p class="ribbon">Царский турнир</p></header>
   <nav>
@@ -392,13 +408,13 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 </div>
 
 <div id="camp" class="screen mscreen" hidden>
-  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><span class="coins"><span class="coin">₽</span><span class="coinVal">0</span></span></div>
+  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><button class="coins" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
   <header><h2 class="h2">Царский путь</h2><p class="sub" id="campStars"></p></header>
   <div id="locs"></div>
 </div>
 
 <div id="quick" class="screen mscreen" hidden>
-  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><span class="coins"><span class="coin">₽</span><span class="coinVal">0</span></span></div>
+  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><button class="coins" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
   <header><h2 class="h2">Быстрая игра</h2></header>
   <div class="opts">
     <div class="opt"><span class="lbl">Колода</span><div class="seg" id="qDeck"></div></div>
@@ -414,21 +430,21 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 </div>
 
 <div id="shop" class="screen mscreen" hidden>
-  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><span class="coins"><span class="coin">₽</span><span class="coinVal">0</span></span></div>
+  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><button class="coins" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
   <header><h2 class="h2">Лавка</h2><p class="sub">Рубашки, колоды и столы</p></header>
   <div class="tabs" role="tablist"><button id="tbBacks" role="tab" aria-selected="true" type="button">Рубашки</button><button id="tbFaces" role="tab" aria-selected="false" type="button">Колоды</button><button id="tbTables" role="tab" aria-selected="false" type="button">Столы</button><button id="tbIap" role="tab" aria-selected="false" type="button" hidden>Казна</button></div>
   <div id="shopGrid"></div>
 </div>
 
 <div id="stats" class="screen mscreen" hidden>
-  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><span class="coins"><span class="coin">₽</span><span class="coinVal">0</span></span></div>
+  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><button class="coins" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
   <header><h2 class="h2">Статистика</h2></header>
   <div class="tabs" role="tablist"><button id="tbSt" role="tab" aria-selected="true" type="button">Игры</button><button id="tbAch" role="tab" aria-selected="false" type="button">Достижения</button></div>
   <div id="statBody"></div>
 </div>
 
 <div id="friends" class="screen mscreen" hidden>
-  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><span class="coins"><span class="coin">₽</span><span class="coinVal">0</span></span></div>
+  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><button class="coins" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
   <header><h2 class="h2">Игра с друзьями</h2><p class="sub">Свой стол, свои правила</p></header>
   <div class="opts">
     <div class="opt"><span class="lbl">Ваше имя</span><input id="fName" class="tin" maxlength="14" autocomplete="nickname" placeholder="Как вас зовут?"></div>
@@ -442,7 +458,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 </div>
 
 <div id="arena" class="screen mscreen" hidden>
-  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><span class="coins"><span class="coin">₽</span><span class="coinVal">0</span></span></div>
+  <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><button class="coins" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
   <header><h2 class="h2">Онлайн-столы</h2><p class="sub">Игроки со всей страны, пустые места займут боты</p></header>
   <div class="opts">
     <button id="aMe" class="panel ame" type="button"><span class="arank" id="aRank">Новичок</span><span class="apts"><b id="aPts">0</b> очков рейтинга</span><span class="abar"><i id="aBar"></i></span><span class="anext" id="aNext"></span><span class="atop">Рейтинг недели ›</span></button>
@@ -568,10 +584,10 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
   try{new URLSearchParams(location.search).forEach(function(v,k){Q[k]=v;});}catch(e){}
   var OK=Q.vk_client==='ok',IOS=/iphone|ipad/.test(Q.vk_platform||''),APP=Q.vk_app_id||'';
   // prices must match the payment server (vkpay/index.js)
-  var PRICES={noads:[35,249],starter:[21,149],boyar:[57,399],coins3000:[14,99],coins10000:[35,249]};
+  var PRICES={starter:[21,149],boyar:[57,399],coins3000:[14,99],coins10000:[35,249],coins30000:[79,549],coins100000:[199,1390]};
   function votes(n){var a=n%10,b=n%100;return n+' '+(a===1&&b!==11?'голос':a>=2&&a<=4&&(b<12||b>14)?'голоса':'голосов');}
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794429121';document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794433868';document.body.appendChild(s);}
   var fallback=setTimeout(function(){log('bridge timeout');boot(null);},8000);
   if(!B){clearTimeout(fallback);boot(null);return;}
   function send(m,p){return B.send(m,p||{});}
