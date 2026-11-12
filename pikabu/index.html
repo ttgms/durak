@@ -132,6 +132,26 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 #home nav .arena .live{display:inline-flex;align-items:center;gap:4px}
 .toplist .who{display:flex;align-items:center;gap:8px}
 .tier .lk .rbadge{vertical-align:-4px}
+.aonline{display:inline-flex;align-items:center;gap:6px}.dot{width:8px;height:8px;border-radius:50%;background:#5fd36b;box-shadow:0 0 0 3px rgba(95,211,107,.25);display:inline-block}
+#home nav .arena .live.on:empty{display:none}
+.atabs{width:min(420px,100%);display:grid!important;grid-template-columns:1fr 1fr}.atabs button{font-weight:600}
+.apane{display:flex;flex-direction:column;gap:12px;align-items:center;width:min(520px,100%)}
+.alhead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;width:100%}.alhead .seg button{padding:7px 11px;font-size:13px}
+.gold.sm{padding:8px 14px;font-size:14px}
+.acreate{width:100%;padding:14px;display:flex;flex-direction:column;gap:10px;align-items:center}.acreate h4{margin:0;font:400 22px var(--display)}
+.acreate .seg{background:rgba(0,0,0,.08)}.acreate .seg button{color:var(--paper-muted)}.acreate .seg button[aria-pressed="true"]{background:#3a2a18;color:#fff3dc}
+.acreate .seg.chips button[aria-pressed="true"]{background:#e6b450;color:#3a2408}.acreate .opt .lbl{color:#8a6a44}.acreate .plain{background:#e3d6bd;color:#3a2a18;border-color:transparent}
+.acreate .seg button:disabled{opacity:.35}.acreate .chint{margin:0;font-size:12px;color:var(--paper-muted);text-align:center}.acreate .row{display:flex;gap:10px}
+#aList{display:flex;flex-direction:column;gap:10px;width:100%}
+.trow{display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:12px 14px;align-items:center}
+.trow .tt{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.trow .tt b{font:400 19px var(--display)}.trow .tt .stk{font-weight:700;color:#a8541c;font-size:14px}
+.trow .td{grid-column:1;font-size:13px;color:var(--paper-muted)}
+.trow .tr{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px}.trow .tr span{font-size:11px;background:#efe3c8;color:#6b4a1e;padding:3px 8px;border-radius:999px}
+.trow .tp{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 12px}.trow .tp span{display:inline-flex;align-items:center;gap:4px;font-size:13px}
+.trow .tp .fr{width:22px;height:22px;border-radius:50%;border:2px dashed #c9b48c;display:inline-block}.trow .tp .bt{font-size:16px}
+.trow .act{grid-column:2;grid-row:1/3;align-self:center}.trow .act .lk{font-size:12px;color:#a8541c}.trow .act .pl{font-size:12px;color:var(--paper-muted)}
+.trow.play{opacity:.75}.trow.mine{outline:3px solid #e6b450}
+#aList .empty{text-align:center;color:var(--muted);padding:18px 8px;font-size:14px}
 button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:hover{filter:brightness(1.1)}button.coins:active{translate:0 1px}
 .cplus{display:grid;place-items:center;width:22px;height:22px;margin-left:3px;border-radius:50%;background:linear-gradient(#7fd36b,#3f9a34);color:#fff;font:900 17px/1 var(--ui);text-shadow:0 1px 0 rgba(0,0,0,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 1px 2px rgba(0,0,0,.4)}
 .coins.big .cplus{width:26px;height:26px;font-size:20px}
@@ -394,7 +414,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
   <header class="title"><h1 class="h1">Дурак</h1><p class="ribbon">Царский турнир</p></header>
   <nav>
     <button id="hCamp" class="gold wide" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19l5-2 6 2 5-2V5l-5 2-6-2-5 2z"/><path d="M9 5v12M15 7v12"/></svg>Царский путь</button>
-    <button id="hArena" class="mtile wide arena" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.3 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.3-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg>Онлайн-столы<span class="live" id="hArenaRank"></span></button>
+    <button id="hArena" class="mtile wide arena" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.3 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.3-3.8-8.5s1.2-6.1 3.8-8.5z"/></svg>Онлайн-столы<span class="live" id="hArenaRank"></span><span class="live on" id="hOnline"></span></button>
     <button id="hQuick" class="mtile blue" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="9" height="13" rx="2"/><path d="M13 8l5 1.3-2.6 10-3.4-.9"/></svg>Быстрая игра</button>
     <button id="hFriends" class="mtile blue" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8.5" cy="9" r="3"/><circle cx="16" cy="10" r="2.5"/><path d="M3 19c.6-3.4 2.8-5 5.5-5s4.9 1.6 5.5 5M14 15.2c.6-.3 1.3-.4 2-.4 2.2 0 3.9 1.3 4.4 4.2"/></svg>С друзьями</button>
     <button id="hShop" class="mtile" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h16l-1.5 10h-13z"/><path d="M8 9a4 4 0 0 1 8 0"/></svg>Лавка</button>
@@ -459,15 +479,33 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
 
 <div id="arena" class="screen mscreen" hidden>
   <div class="topbar"><button class="ghost back" type="button" data-go="home">← Меню</button><button class="coins" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
-  <header><h2 class="h2">Онлайн-столы</h2><p class="sub">Игроки со всей страны, пустые места займут боты</p></header>
+  <header><h2 class="h2">Онлайн-столы</h2><p class="sub aonline" id="aOnline">Игроки со всей страны</p></header>
   <div class="opts">
     <button id="aMe" class="panel ame" type="button"><span class="arank" id="aRank">Новичок</span><span class="apts"><b id="aPts">0</b> очков рейтинга</span><span class="abar"><i id="aBar"></i></span><span class="anext" id="aNext"></span><span class="atop">Рейтинг недели ›</span></button>
     <div class="opt"><span class="lbl">Ваше имя</span><input id="aName" class="tin" maxlength="14" autocomplete="nickname" placeholder="Как вас зовут?"></div>
-    <div class="opt"><span class="lbl">Правила</span><div class="seg" id="aMode"></div></div>
-    <div class="opt"><span class="lbl">Игроков за столом</span><div class="seg" id="aN"></div></div>
-    <div id="aTiers"></div>
+    <div class="seg atabs" id="aTab"></div>
+    <div id="aListP" class="apane">
+      <div class="alhead"><div class="seg" id="aFilt"></div><button id="aNew" class="gold sm" type="button">＋ Свой стол</button></div>
+      <div id="aCreate" class="panel acreate" hidden>
+        <h4>Новый стол</h4>
+        <div class="opt"><span class="lbl">Ставка</span><div class="seg" id="cTier"></div></div>
+        <div class="opt"><span class="lbl">Правила</span><div class="seg" id="cMode"></div></div>
+        <div class="opt"><span class="lbl">Игроков</span><div class="seg" id="cN"></div></div>
+        <div class="opt"><span class="lbl">Колода</span><div class="seg" id="cDeck"></div></div>
+        <div class="opt"><span class="lbl">Особые правила</span><div class="seg chips" id="cRules"></div></div>
+        <div class="row"><button id="cGo" class="gold" type="button">Создать</button><button id="cCancel" class="plain" type="button">Отмена</button></div>
+        <p class="chint">Стол появится в списке. Начните, когда соберутся игроки, — пустые места займут боты.</p>
+      </div>
+      <div id="aList"></div>
+    </div>
+    <div id="aQuickP" class="apane" hidden>
+      <div class="opt"><span class="lbl">Правила</span><div class="seg" id="aMode"></div></div>
+      <div class="opt"><span class="lbl">Игроков за столом</span><div class="seg" id="aN"></div></div>
+      <div id="aTiers"></div>
+      <p class="hint">Посадим за подходящий стол или откроем новый. Если за 12 секунд никто не придёт, свободные места займут боты.</p>
+    </div>
     <p id="aMsg" class="fmsg" aria-live="polite"></p>
-    <p class="hint">Ставка списывается, когда партия начинается. Проигрывает ставку только дурак, остальные получают её обратно и делят выигрыш. Стол берёт десятую часть банка.</p>
+    <p class="hint">Ставка списывается, когда вы садитесь за стол, и возвращается, если уйти до начала. Проигрывает ставку только дурак, остальные получают её обратно и делят выигрыш. Стол берёт десятую часть банка.</p>
   </div>
 </div>
 
@@ -581,7 +619,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
   function log(){try{console.log('[pkb]',[].slice.call(arguments).join(' '));}catch(e){}}
   var started=false;
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794440745';s.onload=function(){};document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794441883';s.onload=function(){};document.body.appendChild(s);}
   // with no SDK (opened outside Pikabu, or it failed) the game still starts, just without the shop and ads
   var fallback=setTimeout(function(){log('sdk timeout');boot(null);},10000);
   // a purchase is shown to our server as Pikabu signed it; the server checks the signature and gives the goods

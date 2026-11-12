@@ -589,7 +589,7 @@ function join(room,name,now,rnd,tok,ac){
   const i=room.seats.findIndex(s=>s.k==='o');if(i<0)return {err:'full'};
   const t=rndToken(rnd);room.seats[i]=Object.assign({k:'h',nm:cleanName(name),tok:t,seen:now},ac?{ac}:{});room.v++;
   // a full open table does not wait any longer
-  if(room.q&&!room.seats.some(s=>s.k==='o'))room.qAt=Math.min(room.qAt,now+1500);
+  if(room.q&&!room.seats.some(s=>s.k==='o'))room.qAt=room.qAt?Math.min(room.qAt,now+1500):now+1500;
   return {seat:i,tok:t};}
 
 // host changes the table before the start: options, or a seat between "open" and "bot"
@@ -610,7 +610,8 @@ function configure(room,tok,ch){
   room.v++;return null;}
 
 function start(room,tok,now,rnd){
-  if((room.q||room.solo)&&tok!==null)return 'quick'; // open tables and games with bots start by themselves
+  // open tables and games with bots start by themselves; a table a player set up in the list is started by its host (bots take the empty seats)
+  if((room.q||room.solo)&&tok!==null&&!(room.q&&room.q.list&&room.st==='lobby'&&seatOf(room,tok)===room.host))return 'quick';
   if(!room.q&&!room.solo&&seatOf(room,tok)!==room.host)return 'not host';if(room.st==='play')return 'already';
   const used=new Set();
   room.seats.forEach((s,i)=>{if(s.k==='h'){s.away=false;s.idle=false;s.to=0;return;}
@@ -717,7 +718,7 @@ function advance(room,now,rnd){
   // an open table starts when it is full or has waited long enough; one that everybody left closes
   if(room.q&&room.st==='lobby'){
     if(!room.seats.some(s=>s.k==='h')){room.st='closed';room.v++;return true;}
-    if(now>=room.qAt){start(room,null,now,rnd||Math.random);return true;}
+    if(room.qAt&&now>=room.qAt){start(room,null,now,rnd||Math.random);return true;}
     return false;}
   if(room.st!=='play')return false;let moved=false;
   // players silent for a long time are looked after by a bot until they come back
@@ -808,6 +809,12 @@ function nextRank(r){for(const k of TITLES)if(r<k[0])return {at:k[0],nm:k[1]};re
 function weekOf(now){return Math.floor((now+3*3600e3-4*86400e3)/604800e3);} // weeks start on Monday, Moscow time
 function quickKey(tier,mode,n){return tier+'|'+mode+'|'+n;}
 function quickOpts(t,mode,n){return {deck:36,n:Math.max(2,Math.min(4,+n||2)),mode:mode==='perevodnoy'?'perevodnoy':'podkidnoy',rules:{},timer:30,level:t.level};}
+// a table a player sets up in the list: the deck and special rules are theirs (no pairs: the stake is paid by one fool)
+const TABLE_RULES=['neighbors','show','noLimit','cheat','dark','fog'];
+function tableOpts(t,req){const deck=[24,36,52].includes(+req.deck)?+req.deck:36,n=Math.max(2,Math.min(4,+req.n||2)),mode=req.mode==='perevodnoy'?'perevodnoy':'podkidnoy';
+  const R=req.rules||{},rules={};for(const k of TABLE_RULES)if(R[k])rules[k]=true;
+  if(n<3)delete rules.neighbors;if(mode!=='perevodnoy')delete rules.show;
+  return {deck,n,mode,rules,timer:30,level:t.level};}
 
 // who gets what when a quick game ends: only the fool loses the stake; the others get it back plus a share of the rest
 function quickResult(room,fin){
@@ -1102,7 +1109,38 @@ function okNotify(store,q,now){const S=store.secrets||{},secret=S.ok||S.vk;
 
 function rndSecure(){try{const b=require('crypto').randomBytes(4);return b.readUInt32LE(0)/4294967296;}catch(e){return Math.random();}}
 const ECO_OPS=new Set(['prof','buy','equip','gift','giftx2','adcoins','dalt','bail']);
-const OPS=new Set(['create','join','poll','act','cfg','start','say','leave','tick','quick','me','top','solo','winx2','iap',...ECO_OPS]);
+const OPS=new Set(['create','join','poll','act','cfg','start','say','leave','tick','quick','me','top','solo','winx2','iap','tables','tcreate','tjoin','sweep',...ECO_OPS]);
+/* ---------- the list of open tables and who is online ---------- */
+// what the list shows of each table that waits for players or is being played; kept up to date on every change
+const TABLES=new Map();let tablesReady=false;
+const SEEN=new Map(); // account -> last request: "online" is everyone heard from in the last minute and a half
+const ONLINE_MS=90000,STALE_MS=75000;
+function track(store,room,now){if(!room||!room.q)return;
+  if(room.st!=='lobby'&&room.st!=='play'){TABLES.delete(room.code);return;}
+  let seen=0;const seats=room.seats.map(s=>{if(s.k!=='h')return {k:s.k};seen=Math.max(seen,s.seen||0);
+    const x=s.ac?store.acc.get(s.ac):null;return {k:'h',nm:s.nm,ri:x?profile(x).ri:0,lvl:x&&x.eco?x.eco.lvl:1};});
+  TABLES.set(room.code,{code:room.code,tier:room.q.tier,stake:room.q.stake,list:!!room.q.list,deck:room.opts.deck,n:room.opts.n,mode:room.opts.mode,rules:room.opts.rules,
+    st:room.st,host:room.host,seats,seen,born:room.born});}
+function tablesInit(store){if(tablesReady)return;tablesReady=true;if(!store._m)return;
+  for(const [,rec] of store._m){try{const r=JSON.parse(rec.d);if(r.q&&(r.st==='lobby'||r.st==='play'))track(store,r,Date.now());}catch(e){}}}
+function onlineCount(now){let n=0;for(const t of SEEN.values())if(now-t<ONLINE_MS)n++;return n;}
+function tableList(store,ac,now){tablesInit(store);const out=[];let playing=0;
+  for(const t of TABLES.values()){if(t.st==='play'){playing++;}
+    else if(now-t.seen>STALE_MS||!t.seats.some(s=>s.k==='o'))continue;
+    out.push(t);}
+  // waiting tables first (the fullest on top), then the ones being played
+  out.sort((a,b)=>(a.st==='play')-(b.st==='play')||b.seats.filter(s=>s.k==='h').length-a.seats.filter(s=>s.k==='h').length||b.born-a.born);
+  return {tables:out.slice(0,60),online:Math.max(onlineCount(now),ac?1:0),playing,now};}
+// tables everybody walked away from before the start close, and the stakes go back
+async function sweep(store,now){tablesInit(store);
+  for(const [a,t] of SEEN)if(now-t>ONLINE_MS*4)SEEN.delete(a);
+  for(const t of [...TABLES.values()]){if(t.st!=='lobby'||now-t.seen<STALE_MS+15000)continue;
+    for(let attempt=0;attempt<3;attempt++){const rec=await store.load(t.code);if(!rec||rec.room.st!=='lobby'){TABLES.delete(t.code);break;}
+      const room=rec.room;if(room.seats.some(s=>s.k==='h'&&now-(s.seen||0)<STALE_MS)){track(store,room,now);break;}
+      const back=room.seats.filter(s=>s.k==='h'&&s.ac&&s.paid).map(s=>[s.ac,s.paid]);
+      room.st='closed';room.v++;if(!(await store.save(room,rec.ver)))continue;
+      for(const [a,p] of back)stakeBack(store,a,p,now);if(room.q.key)openDrop(room.q.key,room.code);TABLES.delete(t.code);break;}}
+  return {ok:1};}
 // open tables that still wait for people, by kind (tier|mode|players); only a hint, every table is checked on load
 const OPEN=new Map();
 function openAdd(key,code){if(!OPEN.has(key))OPEN.set(key,[]);OPEN.get(key).push(code);}
@@ -1112,7 +1150,11 @@ async function handle(store,req,now){
   now=now||Date.now();const op=String(req.op||'');
   if(!OPS.has(op))return {err:'bad op'};
   if(!store.acc)store.acc=new Map();
-  const ac=resolveAcct(store,req);
+  const ac=resolveAcct(store,req);if(ac)SEEN.set(ac,now);
+  if(op==='sweep')return req._internal?sweep(store,now):{err:'bad op'};
+  if(op==='tables')return tableList(store,ac,now);
+  if(op==='tcreate')return tableCreate(store,req,ac,now);
+  if(op==='tjoin')return tableJoin(store,req,ac,now);
   if(op==='me'){if(!ac)return {err:'bad acct'};const x=accGet(store,ac,now);return {me:profile(x),tiers:TIERS,now};}
   if(op==='top')return Object.assign(topLists(store,now,ac),{now});
   if(op==='quick')return quickJoin(store,req,ac,now);
@@ -1129,7 +1171,9 @@ async function handle(store,req,now){
     const rec=await store.load(code);if(!rec||rec.room.st==='closed'||rec.room.exp<now)return {err:'no room'};
     const room=rec.room,v0=room.v,l0=room.log.length,c0=room.ci;let err=null,seat=seatOf(room,req.tok),tok=req.tok;
     if(op==='tick'){advance(room,now,rndSecure);rateQuick(store,room,now);settleSolo(store,room,now);settleNet(store,room,now);if(room.q&&room.st!=='lobby')openDrop(room.q.key,room.code);
-      if(room.v!==v0&&!(await store.save(room,rec.ver)))continue;return {room:{code:room.code},due:nextDue(room),_l0:l0,_c0:c0,now};}
+      if(room.v!==v0&&!(await store.save(room,rec.ver)))continue;track(store,room,now);return {room:{code:room.code},due:nextDue(room),_l0:l0,_c0:c0,now};}
+    // a seat at a table with a stake is only taken through the list or the quick game, where the stake is paid
+    if(op==='join'&&room.q&&seatOf(room,req.tok)<0)return {err:'quick'};
     if(op==='join'){const r=join(room,req.name,now,rndSecure,req.tok,ac);if(r.err)return {err:r.err};seat=r.seat;tok=r.tok;}
     else{if(seat<0)return {err:'not seated'};const s=room.seats[seat];
       if(now-(s.seen||0)>15000||(s.away&&!s.left)){s.seen=now;s.away=false;room.v++;}}
@@ -1142,6 +1186,7 @@ async function handle(store,req,now){
     advance(room,now,rndSecure);rateQuick(store,room,now);settleSolo(store,room,now);settleNet(store,room,now);if(room.q&&room.st!=='lobby')openDrop(room.q.key,room.code);
     room.exp=now+ROOM_TTL;
     if(room.v!==v0||op==='join'){if(!(await store.save(room,rec.ver)))continue;}
+    track(store,room,now);
     const since=req.since==null?-1:+req.since;
     const out=Object.assign({},viewFor(room,seat,since,+req.cs||0),{now});
     if(op==='join')Object.assign(out,{tok,seat});
@@ -1157,21 +1202,43 @@ async function quickJoin(store,req,ac,now){
   if(ecoOf(me).coins<t.stake)return {err:'coins',need:t.stake};
   const o=quickOpts(t,req.mode,req.n),key=quickKey(t.id,o.mode,o.n);me.nm=cleanName(req.name);accPut(store,ac,me);
   const list=(OPEN.get(key)||[]).slice();
-  for(const code of list){
-    for(let attempt=0;attempt<4;attempt++){const rec=await store.load(code);
-      if(!rec||rec.room.st!=='lobby'||!rec.room.q||rec.room.qAt<now+1500||!rec.room.seats.some(s=>s.k==='o')){openDrop(key,code);break;}
-      const room=rec.room;
-      // the same person twice at one table is not a game
-      if(room.seats.some(s=>s.k==='h'&&s.ac===ac)){openDrop(key,code);break;}
-      const r=join(room,req.name,now,rndSecure,'',ac);if(r.err){openDrop(key,code);break;}
-      room.exp=now+ROOM_TTL;room.seats[r.seat].paid=t.stake;
-      if(!(await store.save(room,rec.ver)))continue;
-      if(!stakeTake(store,ac,t.stake,now)){/* spent meanwhile: give the seat back */const rec2=await store.load(code);if(rec2){leave(rec2.room,r.tok,now);await store.save(rec2.room,rec2.ver);}return {err:'coins',need:t.stake};}
-      if(!room.seats.some(s=>s.k==='o'))openDrop(key,code);
-      return Object.assign({tok:r.tok,seat:r.seat},viewFor(room,r.seat,-1,0),{now,due:nextDue(room),_l0:0,_c0:0,_changed:true});}}
-  for(let k=0;k<8;k++){const r=newRoom(o,req.name,now,rndSecure,ac,{tier:t.id,stake:t.stake,key});r.room.seats[0].paid=t.stake;
-    if(await store.create(r.room)){if(!stakeTake(store,ac,t.stake,now)){r.room.st='closed';await store.save(r.room,1);return {err:'coins',need:t.stake};}openAdd(key,r.room.code);return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now,due:nextDue(r.room)});}}
+  for(const code of list){const r=await sitAt(store,code,req,ac,now,true);if(r)return r;}
+  return newTable(store,o,t,req,ac,now,key,false);}
+// a seat at one waiting table, the stake paid; null if this table will not do (the quick game then tries the next one)
+async function sitAt(store,code,req,ac,now,quick){
+  for(let attempt=0;attempt<4;attempt++){const rec=await store.load(code);const room=rec&&rec.room;
+    const key=room&&room.q?room.q.key:null,drop=()=>{if(key)openDrop(key,code);};
+    if(!room||room.st!=='lobby'||!room.q||(room.qAt&&room.qAt<now+1500)||!room.seats.some(s=>s.k==='o')){drop();return quick?null:{err:'gone'};}
+    const t=tierOf(room.q.tier),me=accGet(store,ac,now);
+    if(me.r<t.need)return quick?null:{err:'rank',need:t.need};if(ecoOf(me).coins<t.stake)return quick?null:{err:'coins',need:t.stake};
+    // the same person twice at one table is not a game
+    if(room.seats.some(s=>s.k==='h'&&s.ac===ac))return quick?null:{err:'seated'};
+    const r=join(room,req.name,now,rndSecure,'',ac);if(r.err){drop();return quick?null:{err:'gone'};}
+    room.exp=now+ROOM_TTL;room.seats[r.seat].paid=t.stake;
+    if(!(await store.save(room,rec.ver)))continue;
+    if(!stakeTake(store,ac,t.stake,now)){/* spent meanwhile: give the seat back */const rec2=await store.load(code);if(rec2){leave(rec2.room,r.tok,now);await store.save(rec2.room,rec2.ver);track(store,rec2.room,now);}return {err:'coins',need:t.stake};}
+    if(!room.seats.some(s=>s.k==='o'))drop();
+    track(store,room,now);
+    return Object.assign({tok:r.tok,seat:r.seat},viewFor(room,r.seat,-1,0),{now,due:nextDue(room),_l0:0,_c0:0,_changed:true});}
+  return quick?null:{err:'busy'};}
+async function newTable(store,o,t,req,ac,now,key,list){
+  for(let k=0;k<8;k++){const r=newRoom(o,req.name,now,rndSecure,ac,Object.assign({tier:t.id,stake:t.stake,key},list?{list:1}:{}));r.room.seats[0].paid=t.stake;
+    if(list)r.room.qAt=0; // waits for people until the host starts it (or it fills up)
+    if(await store.create(r.room)){if(!stakeTake(store,ac,t.stake,now)){r.room.st='closed';await store.save(r.room,1);return {err:'coins',need:t.stake};}
+      if(key)openAdd(key,r.room.code);track(store,r.room,now);return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now,due:nextDue(r.room)});}}
   return {err:'busy'};}
+// a player sets up a table of their own in the list
+async function tableCreate(store,req,ac,now){
+  if(!ac)return {err:'bad acct'};const t=tierOf(req.tier);if(!t)return {err:'bad tier'};
+  const me=accGet(store,ac,now);if(me.r<t.need)return {err:'rank',need:t.need};
+  if(ecoOf(me).coins<t.stake)return {err:'coins',need:t.stake};
+  const o=tableOpts(t,req);me.nm=cleanName(req.name);accPut(store,ac,me);
+  // a plain table can also be found by the quick game
+  const plain=o.deck===36&&!Object.keys(o.rules).length,key=plain?quickKey(t.id,o.mode,o.n):null;
+  return newTable(store,o,t,req,ac,now,key,true);}
+async function tableJoin(store,req,ac,now){if(!ac)return {err:'bad acct'};const code=normCode(req.code);if(!code)return {err:'bad code'};
+  const me=accGet(store,ac,now);me.nm=cleanName(req.name);accPut(store,ac,me);
+  return sitAt(store,code,req,ac,now,false);}
 
 // an in-memory store for local testing
 function memStore(){const m=new Map();
@@ -1257,7 +1324,7 @@ async function tick(code){timers.delete(code);const v0=verOf(code);
   if(verOf(code)!==v0)broadcast(code,r._l0,r._c0,null);schedule(code,r.due);}
 const strip=o=>{const r={};for(const k in o)if(k[0]!=='_')r[k]=o[k];return r;};
 async function serve(req,sock){
-  if(!req||typeof req!=='object')return {err:'bad request'};if(req.op==='tick')return {err:'bad op'};
+  if(!req||typeof req!=='object')return {err:'bad request'};if(req.op==='tick'||req.op==='sweep')return {err:'bad op'};
   if(req.op==='ping')return {pong:1,now:Date.now()};
   const code0=req.code?String(req.code):'';
   const res=await core.handle(store,req);
@@ -1273,6 +1340,9 @@ async function serve(req,sock){
 const handle0=core.handle;core.handle=async(st,req)=>{const c=req.code?String(req.code):'';
   const norm=c&&typeof normCode==='function'?normCode(c):c;const v0=norm?verOf(norm):0;const r=await handle0(st,req);
   if(r&&r.room&&r.room.code)r._changed=req.op==='create'||req.op==='join'||verOf(r.room.code)!==v0;return r;};
+
+// tables everybody walked away from close and give the stakes back
+setInterval(()=>{core.handle(store,{op:'sweep',_internal:1}).catch(e=>console.error('sweep',e));},30000);
 
 /* ---------- HTTP ---------- */
 const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'POST, GET, OPTIONS'};

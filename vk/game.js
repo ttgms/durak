@@ -1958,9 +1958,13 @@ function renderLobby(){
   const quick=!!net.room.q;$('lShareRow').hidden=quick;$('lCode').classList.toggle('wait',quick);
   if(quick){const r=net.room,t=arenaTier(r.q.tier);
     $('lCodeL').textContent=`Стол «${t.nm}» · ставка ${fmtNum(r.q.stake)}`;lobbyCountdown();
-    const open=r.seats.filter(x=>x.k==='o').length;$('lSub').textContent=`${MODE_NAME[r.opts.mode]}, ${plural(r.seats.length,'игрок','игрока','игроков')}`+(open?` · свободно ${open}`:'');
-    $('lSeats').innerHTML=r.seats.map((x,i)=>`<div class="lseat">${x.k==='h'?`<span class="pic">${avatarSVG(x.nm,i)}</span><b>${esc(x.nm)}</b>${i===r.me?'<em>вы</em>':''}`:`<span class="pic free">+</span><b class="dim">Ждём игрока…</b>`}</div>`).join('');
-    $('lOpts').innerHTML='';$('lStart').hidden=true;$('lWait').textContent='Если никто не придёт, свободные места займут боты.';return;}
+    const open=r.seats.filter(x=>x.k==='o').length,host=r.q.list&&r.host===r.me;
+    $('lSub').textContent=`${MODE_NAME[r.opts.mode]}, ${r.opts.deck} карт, ${plural(r.seats.length,'игрок','игрока','игроков')}`+(open?` · свободно ${open}`:'');
+    $('lSeats').innerHTML=r.seats.map((x,i)=>`<div class="lseat">${x.k==='h'?`<span class="pic">${avatarSVG(x.nm,i)}</span><b>${esc(x.nm)}</b>${i===r.me?'<em>вы</em>':''}${r.q.list&&i===r.host?'<em>хозяин</em>':''}${x.away?'<em>нет связи</em>':''}`:`<span class="pic free">+</span><b class="dim">Ждём игрока…</b>`}</div>`).join('');
+    const rl=ruleNames(r.opts.rules);
+    $('lOpts').innerHTML=rl.length?`<div class="panel lsum"><div><span>Особые правила</span><b>${rl.join(', ')}</b></div></div>`:'';
+    $('lStart').hidden=!host;$('lStart').textContent=open?'Начать (пустые места — боты)':'Начать игру';
+    $('lWait').textContent=!r.q.list?'Если никто не придёт, свободные места займут боты.':host?'Стол виден в списке. Когда все сядут, игра начнётся сама.':'Игра начнётся, когда сядут все или хозяин стола её начнёт.';return;}
   $('lCodeL').textContent='Код стола';$('lCopy').textContent=shareLink()?'Скопировать ссылку':'Скопировать код';
   const r=net.room,host=r.host===r.me,o=r.opts,maxN={24:4,36:5,52:6,54:6}[o.deck];
   $('lCode').textContent=r.code;
@@ -1991,7 +1995,7 @@ function renderLobby(){
     const rl=RULE_CHIPS.filter(([k])=>o.rules[k]).map(([,t])=>t);
     O.innerHTML=`<div class="panel lsum"><div><span>Колода</span><b>${o.deck===54?'54 с джокерами':o.deck}</b></div><div><span>Правила</span><b>${MODE_NAME[o.mode]}</b></div>
       <div><span>Время на ход</span><b>${o.timer} с</b></div><div><span>Боты</span><b>${LEVEL_NAME[o.level]}</b></div>${rl.length?`<div><span>Особые</span><b>${rl.join(', ')}</b></div>`:''}</div>`;}
-  $('lStart').hidden=!host;$('lWait').textContent=host?(open?'Свободные места займут боты, если начать сейчас.':''):'Хозяин стола начнёт игру, когда все соберутся.';}
+  $('lStart').hidden=!host;$('lStart').textContent='Начать игру';$('lWait').textContent=host?(open?'Свободные места займут боты, если начать сейчас.':''):'Хозяин стола начнёт игру, когда все соберутся.';}
 $('lStart').onclick=()=>{audio();netCall('start');};
 // a link with ?t=CODE opens the friends' screen ready to join
 (function(){try{const t=new URLSearchParams(location.search).get('t')||(window.__PF&&window.__PF.startCode);if(t){$('fCode').value=t;show('friends');renderFriends();$('fMsg').textContent='Введите имя и нажмите «Войти».';}}catch(e){}})();
@@ -2033,6 +2037,10 @@ function titleOf(r){let x=ARENA_TITLES[0];for(const k of ARENA_TITLES)if(r>=k[0]
 function bestWin(S,n){const extra=Math.floor(n*S*.9)-(n-1)*S;return Math.floor(extra*({2:1,3:.6,4:.5}[n]||.5));}
 function renderArena(){
   $('aName').value=save.net.name||(window.__PF&&window.__PF.userName)||'';
+  if(!save.arena.tab)save.arena.tab='list';
+  segButtons($('aTab'),[['list','Столы'],['quick','Быстрая игра']],save.arena.tab,v=>{save.arena.tab=v;persist();renderArena();});
+  $('aListP').hidden=save.arena.tab!=='list';$('aQuickP').hidden=save.arena.tab!=='quick';
+  renderTables();tablesPoll();
   segButtons($('aMode'),[['podkidnoy','Подкидной'],['perevodnoy','Переводной']],save.arena.mode,v=>{save.arena.mode=v;persist();renderArena();});
   segButtons($('aN'),[[2,'2'],[3,'3'],[4,'4']],save.arena.n,v=>{save.arena.n=v;persist();renderArena();});
   renderArenaMe();
@@ -2050,22 +2058,76 @@ function renderArenaMe(){const m=arenaMe||{r:0,rank:'Новичок',next:{at:10
   $('aBar').style.width=(m.next?Math.min(100,Math.round((m.r-prev)/(m.next.at-prev)*100)):100)+'%';
   $('aNext').textContent=m.next?`До звания «${m.next.nm}»: ${fmtNum(m.next.at-m.r)}`:'Высшее звание';}
 function arenaName(){const v=$('aName').value.replace(/[<>&"'`\\]/g,'').trim().slice(0,14);if(v!==save.net.name){save.net.name=v;persist();}return v||'Игрок';}
-function arenaPlay(tier){const t=arenaTier(tier);const msg=$('aMsg');msg.textContent='';
-  if(!NET_API){msg.textContent='Онлайн-столы скоро заработают.';return;}
-  if(save.coins<t.stake){
-    const d=dayKey(),canBail=save.coins<ARENA_TIERS[0].stake&&(!save.bail||save.bail!==d);
-    if(canBail){msg.innerHTML=`Монеты закончились. <button class="plain sm" type="button" id="aBail">Взять ${BAIL} на игру</button>`;
-      $('aBail').onclick=()=>{ecoCall('bail').then(v=>{if(v.amount){coinSnd();msg.textContent=`+${v.amount} монет — удачи за столом!`;}else msg.textContent='Сегодня монеты уже выдавали.';});};}
-    else{msg.innerHTML=`Для этого стола нужно ${fmtNum(t.stake)} монет.`+(window.__PF&&window.__PF.store?' <button class="plain sm" type="button" id="aBuy">В казну</button>':' Сыграйте за столом попроще.');
-      const b=$('aBuy');if(b)b.onclick=()=>{shopTab='iap';show('shop');};}
-    return;}
-  if(!$('arena').hidden)msg.textContent='Ищем стол…';
-  netReq('quick',{acct:myAcct(),name:arenaName(),tier:t.id,mode:save.arena.mode,n:save.arena.n}).then(v=>{
-    if(!v||v.err||!v.room){show('arena');$('aMsg').textContent=v&&v.err==='rank'?'Этот стол откроется с новым званием.':v&&v.err==='coins'?'Не хватает монет на ставку.':'Не получилось связаться с сервером. Попробуйте ещё раз.';return;}
-    api('prof').then(applyEco); // the stake has been taken
-    net.code=v.room.code;net.tok=v.tok;net.room=v.room;net.cs=0;net.m=null;net.have=0;
-    $('aMsg').textContent='';netConnect();netOn(v,-1);});}
-function lobbyCountdown(){const r=net.room;if(!r||!r.qAt)return;const left=Math.max(0,Math.ceil((r.qAt-(Date.now()+net.skew))/1000));
+function arenaPlay(tier){const t=arenaTier(tier);if(!stakeOk(t))return;
+  if(!$('arena').hidden)$('aMsg').textContent='Ищем стол…';
+  netReq('quick',{acct:myAcct(),name:arenaName(),tier:t.id,mode:save.arena.mode,n:save.arena.n}).then(arenaEnter);}
+/* ---------- the list of tables: everyone's tables, one's own, who is online ---------- */
+let tablesV=null,tablesT=0,createOpen=false;
+if(!save.arena.c)save.arena.c={tier:'fair',mode:'podkidnoy',n:2,deck:36,rules:{}};
+const TABLE_RULE_CHIPS=[['neighbors','Только соседи'],['show','Перевод показом'],['noLimit','Без лимита'],['cheat','Шулерство'],['dark','Тёмный козырь'],['fog','Туман']];
+function ruleNames(rl){return RULE_CHIPS.filter(([k])=>rl&&rl[k]).map(([,t])=>t);}
+function onlineText(v){return `<span class="dot"></span>Сейчас онлайн: ${fmtNum(v.online)}`+(v.playing?` · идёт игр: ${v.playing}`:'');}
+// asked every few seconds while the list is open, and now and then elsewhere (that also counts this player as online)
+function tablesPoll(){clearTimeout(tablesT);if(!NET_API)return;
+  const onArena=!$('arena').hidden,vis=!document.hidden;
+  if(vis&&(onArena||!$('home').hidden))api('tables').then(v=>{if(v&&!v.err&&v.tables){tablesV=v;if(!$('arena').hidden)renderTables();renderOnline();}});
+  tablesT=setTimeout(tablesPoll,onArena&&vis?4000:45000);}
+function renderOnline(){if(!tablesV)return;$('aOnline').innerHTML=onlineText(tablesV);
+  const h=$('hOnline');if(h)h.innerHTML=`<span class="dot"></span>${fmtNum(tablesV.online)}`;}
+function renderTables(){
+  const F=save.arena.filt||'all';
+  segButtons($('aFilt'),[['all','Все'],...ARENA_TIERS.map(t=>[t.id,t.nm])],F,v=>{save.arena.filt=v;persist();renderTables();});
+  renderCreate();
+  const box=$('aList');if(!NET_API){box.innerHTML='<div class="empty">Онлайн-столы скоро заработают.</div>';return;}
+  if(!tablesV){box.innerHTML='<div class="empty">Загружаем столы…</div>';return;}
+  const r=arenaMe?arenaMe.r:0,list=tablesV.tables.filter(t=>F==='all'||t.tier===F);
+  if(!list.length){box.innerHTML=`<div class="empty">Свободных столов ${F==='all'?'пока нет':'с такой ставкой нет'}. Создайте свой — или нажмите «Быстрая игра».</div>`;return;}
+  box.innerHTML=list.map(t=>{const T=arenaTier(t.tier),lock=r<T.need,play=t.st==='play',ppl=t.seats.filter(s=>s.k==='h').length;
+    const rl=ruleNames(t.rules),mine=net.code===t.code;
+    const who=t.seats.map(s=>s.k==='h'?`<span>${rankBadge(s.ri||0,20)}${esc(s.nm)}</span>`:s.k==='b'?'<span class="bt">🤖</span>':'<span class="fr"></span>').join('');
+    const act=play?'<span class="pl">Идёт игра</span>':lock?`<span class="lk">🔒 ${titleOf(T.need)}</span>`:`<button class="gold sm" type="button" data-j="${t.code}">Сесть</button>`;
+    return `<div class="panel trow${play?' play':''}${mine?' mine':''}"><div class="tt"><b>${T.nm}</b><span class="stk">ставка ${fmtNum(t.stake)}</span></div>
+      <div class="td">${MODE_NAME[t.mode]} · ${t.deck} карт · ${ppl} из ${t.n}${t.list?'':' · быстрый'}</div><div class="act">${act}</div>
+      ${rl.length?`<div class="tr">${rl.map(x=>`<span>${x}</span>`).join('')}</div>`:''}<div class="tp">${who}</div></div>`;}).join('');
+  box.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>{audio();tableSit(b.dataset.j);});}
+function renderCreate(){const P=$('aCreate');P.hidden=!createOpen;$('aNew').hidden=createOpen;if(!createOpen)return;
+  const c=save.arena.c,r=arenaMe?arenaMe.r:0,maxN=c.deck===24?4:4;
+  const re=()=>{persist();renderCreate();};
+  segButtons($('cTier'),ARENA_TIERS.map(t=>[t.id,fmtNum(t.stake),r<t.need]),c.tier,v=>{c.tier=v;re();});
+  segButtons($('cMode'),[['podkidnoy','Подкидной'],['perevodnoy','Переводной']],c.mode,v=>{c.mode=v;re();});
+  segButtons($('cN'),[2,3,4].map(k=>[k,String(k),k>maxN]),c.n,v=>{c.n=v;re();});
+  segButtons($('cDeck'),[[24,'24'],[36,'36'],[52,'52']],c.deck,v=>{c.deck=v;re();});
+  const need={neighbors:c.n<3?'от 3 игроков':'',show:c.mode!=='perevodnoy'?'в переводном':''};
+  $('cRules').innerHTML=TABLE_RULE_CHIPS.map(([k,t])=>`<button type="button" aria-pressed="${!!c.rules[k]&&!need[k]}" ${need[k]?'disabled':''} data-k="${k}">${t}${need[k]?` <small>(${need[k]})</small>`:''}</button>`).join('');
+  $('cRules').querySelectorAll('button').forEach(b=>b.onclick=()=>{c.rules[b.dataset.k]=!c.rules[b.dataset.k];re();});
+  $('cGo').textContent=`Создать — ставка ${fmtNum(arenaTier(c.tier).stake)}`;}
+$('aNew').onclick=()=>{audio();createOpen=true;renderCreate();};
+$('cCancel').onclick=()=>{createOpen=false;renderCreate();};
+$('cGo').onclick=()=>{audio();const c=save.arena.c,t=arenaTier(c.tier);if(!stakeOk(t))return;
+  const rules={};for(const [k] of TABLE_RULE_CHIPS)if(c.rules[k])rules[k]=true;
+  $('aMsg').textContent='Ставим стол…';
+  netReq('tcreate',{acct:myAcct(),name:arenaName(),tier:t.id,mode:c.mode,n:c.n,deck:c.deck,rules}).then(v=>{createOpen=false;arenaEnter(v);});};
+function tableSit(code){const t=tablesV&&tablesV.tables.find(x=>x.code===code);if(t&&!stakeOk(arenaTier(t.tier)))return;
+  $('aMsg').textContent='Садимся…';netReq('tjoin',{acct:myAcct(),name:arenaName(),code}).then(v=>{if(v&&v.err==='gone'){$('aMsg').textContent='За этим столом уже нет места.';api('tables').then(x=>{if(x&&x.tables){tablesV=x;renderTables();}});return;}arenaEnter(v);});}
+// enough coins for the stake? if not, say what to do
+function stakeOk(t){const msg=$('aMsg');msg.textContent='';
+  if(!NET_API){msg.textContent='Онлайн-столы скоро заработают.';return false;}
+  if(save.coins>=t.stake)return true;
+  const d=dayKey(),canBail=save.coins<ARENA_TIERS[0].stake&&(!save.bail||save.bail!==d);
+  if(canBail){msg.innerHTML=`Монеты закончились. <button class="plain sm" type="button" id="aBail">Взять ${BAIL} на игру</button>`;
+    $('aBail').onclick=()=>{ecoCall('bail').then(v=>{if(v.amount){coinSnd();msg.textContent=`+${v.amount} монет — удачи за столом!`;}else msg.textContent='Сегодня монеты уже выдавали.';});};}
+  else{msg.innerHTML=`Для этого стола нужно ${fmtNum(t.stake)} монет.`+(window.__PF&&window.__PF.store?' <button class="plain sm" type="button" id="aBuy">В казну</button>':' Сыграйте за столом попроще.');
+    const b=$('aBuy');if(b)b.onclick=()=>{shopTab='iap';show('shop');};}
+  return false;}
+// a seat was given (or not): to the lobby of that table
+function arenaEnter(v){
+  if(!v||v.err||!v.room){show('arena');$('aMsg').textContent=v&&v.err==='rank'?'Этот стол откроется с новым званием.':v&&v.err==='coins'?'Не хватает монет на ставку.':v&&v.err==='seated'?'Вы уже за этим столом.':'Не получилось связаться с сервером. Попробуйте ещё раз.';return;}
+  api('prof').then(applyEco); // the stake has been taken
+  net.code=v.room.code;net.tok=v.tok;net.room=v.room;net.cs=0;net.m=null;net.have=0;
+  $('aMsg').textContent='';netConnect();netOn(v,-1);}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)tablesPoll();});
+if(NET_API)setTimeout(tablesPoll,1500);
+function lobbyCountdown(){const r=net.room;if(!r)return;if(!r.qAt){if(r.q&&r.q.list)$('lCode').textContent='Ждём игроков…';return;}const left=Math.max(0,Math.ceil((r.qAt-(Date.now()+net.skew))/1000));
   $('lCode').textContent=left>0?`Ищем соперников… 0:${String(left).padStart(2,'0')}`:'Садимся за стол…';}
 /* the weekly table */
 let topTab='week';
