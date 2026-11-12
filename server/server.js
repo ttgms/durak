@@ -1271,6 +1271,7 @@ const PORT=+process.env.PORT||8080,DATA=process.env.DATA||'/var/lib/durak/rooms.
 /* ---------- rooms: in memory, saved to disk ---------- */
 const store=core.memStore();let dirty=false,accDirty=false;
 const ACC=path.join(path.dirname(DATA),'accounts.json');
+var hadAccounts=fs.existsSync(ACC); // a new machine (no accounts yet) takes the last backup back, see below
 store.iapUsed=new Map();
 try{const raw=JSON.parse(fs.readFileSync(ACC,'utf8'));
   if(Array.isArray(raw))store.acc=new Map(raw);else{store.acc=new Map(raw.a||[]);store.iapUsed=new Map(raw.u||[]);}
@@ -1297,6 +1298,42 @@ function persist(){if(!dirty)return;dirty=false;const now=Date.now();
 setInterval(persist,5000);
 process.on('SIGTERM',()=>{dirty=true;persist();persistAcc();process.exit(0);});
 process.on('SIGINT',()=>{dirty=true;persist();persistAcc();process.exit(0);});
+
+/* ---------- backups: accounts (coins, purchases, ranks) are copied to Object Storage every few hours ---------- */
+// The bucket is named in the metadata secrets as "backup"; the machine's own service account (storage.uploader +
+// storage.viewer) gives the key, so no secret is kept here. Files rotate by weekday and hour (28 of them, overwritten),
+// plus one per month and "latest". A machine that starts without accounts.json takes "latest" back by itself.
+const zlib=require('zlib');
+function iamToken(cb){require('http').get({host:'169.254.169.254',path:'/computeMetadata/v1/instance/service-accounts/default/token',headers:{'Metadata-Flavor':'Google'},timeout:3000},res=>{
+  let b='';res.setEncoding('utf8');res.on('data',d=>b+=d);res.on('end',()=>{try{cb(res.statusCode===200?JSON.parse(b).access_token:null);}catch(e){cb(null);}});})
+  .on('error',()=>cb(null)).on('timeout',function(){this.destroy();});}
+function s3(method,key,body,cb){const bucket=store.secrets.backup;if(!bucket)return cb&&cb(0,'no bucket');
+  iamToken(tok=>{if(!tok)return cb&&cb(0,'no token');
+    const rq=require('https').request({host:'storage.yandexcloud.net',path:'/'+encodeURIComponent(bucket)+'/'+key,method,headers:Object.assign({Authorization:'Bearer '+tok},body?{'Content-Length':body.length,'Content-Type':'application/gzip'}:{}),timeout:30000},res=>{
+      const parts=[];res.on('data',d=>parts.push(d));res.on('end',()=>cb&&cb(res.statusCode,Buffer.concat(parts)));});
+    rq.on('error',e=>cb&&cb(0,e.message));rq.on('timeout',()=>rq.destroy());if(body)rq.write(body);rq.end();});}
+let lastBackup={at:0,ok:false,err:''};
+function backup(){if(!store.secrets.backup)return;
+  if(!hadAccounts&&!restoreDone){setTimeout(backup,30000);return;} // never write over the copy before it was taken back
+  const body=zlib.gzipSync(JSON.stringify({a:[...store.acc],u:[...store.iapUsed],at:Date.now()}));
+  const d=new Date(Date.now()+3*3600e3),slot='d'+d.getUTCDay()+'-h'+String(Math.floor(d.getUTCHours()/6)*6).padStart(2,'0'),month='m'+d.toISOString().slice(0,7);
+  let left=3,bad='';const done=(code,err)=>{if(code!==200)bad=bad||String(code||err);if(--left)return;
+    lastBackup={at:Date.now(),ok:!bad,err:bad};console.log(bad?'backup failed: '+bad:'backup ok '+store.acc.size+' accounts');};
+  s3('PUT','backups/latest.json.gz',body,done);s3('PUT','backups/'+slot+'.json.gz',body,done);s3('PUT','backups/'+month+'.json.gz',body,done);}
+setInterval(backup,6*3600e3);
+// first backup soon after the start (secrets come from the metadata a moment later)
+setTimeout(backup,90*1000);
+// a machine without accounts takes the last copy back
+var hadAccounts,restoreDone=false;let restoreBusy=false;
+function maybeRestore(){if(hadAccounts||restoreDone||restoreBusy||!store.secrets.backup)return;restoreBusy=true;
+  s3('GET','backups/latest.json.gz',null,(code,buf)=>{restoreBusy=false;
+    if(code===404){restoreDone=true;console.log('restore: no copy yet');return;}
+    if(code!==200){console.log('restore: will try again ('+code+')');return;}restoreDone=true;
+    try{const raw=JSON.parse(zlib.gunzipSync(buf).toString('utf8'));let n=0;
+      for(const [a,x] of raw.a||[])if(!store.acc.has(a)){store.acc.set(a,x);n++;}
+      for(const [k,v] of raw.u||[])if(!store.iapUsed.has(k))store.iapUsed.set(k,v);
+      accDirty=true;persistAcc();console.log('restored',n,'accounts from the backup');}catch(e){console.error('restore failed',e.message);}});}
+setInterval(maybeRestore,5000);
 
 /* ---------- updating itself: a newer server on GitHub is picked up when no game is being played ---------- */
 // the service downloads server.js on every start, so leaving is enough; rooms and accounts are saved first
@@ -1365,7 +1402,7 @@ const server=http.createServer((rq,rs)=>{
     const q=Object.fromEntries(new URL(rq.url,'http://x').searchParams);delete q.ok;let out;
     try{out=core.okNotify(store,q,Date.now());}catch(e){console.error(e);out={err:true,code:9999,body:'<error/>'};}
     const hd={'Content-Type':'application/xml; charset=utf-8'};if(out.err)hd['invocation-error']=String(out.code);rs.writeHead(200,hd);rs.end(out.body);return;}
-  if(rq.url==='/health'){rs.writeHead(200,Object.assign({'Content-Type':'text/plain'},CORS));rs.end('ok '+store._m.size);return;}
+  if(rq.url==='/health'){rs.writeHead(200,Object.assign({'Content-Type':'text/plain'},CORS));rs.end('ok '+store._m.size+(store.secrets.backup?' backup '+(lastBackup.at?(lastBackup.ok?'ok ':'FAILED '+lastBackup.err+' ')+Math.round((Date.now()-lastBackup.at)/60000)+'m ago':'pending'):''));return;}
   if(rq.method==='POST'&&rq.url.split('?')[0]==='/api'){let b='';let big=false;
     rq.on('data',d=>{b+=d;if(b.length>65536){big=true;rq.destroy();}});
     rq.on('end',async()=>{if(big)return;let out;try{out=await serve(JSON.parse(b||'{}'),null);}catch(e){console.error(e);out={err:'server'};}
