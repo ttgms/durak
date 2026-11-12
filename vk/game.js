@@ -1926,7 +1926,8 @@ function netOverButtons(main,alt){
   const host=net.room.host===net.room.me;
   if(host){main.textContent='Ещё партию';main.disabled=false;main.onclick=()=>{main.disabled=true;netCall('start');};
     // the same table, back to its settings: everybody stays seated and sees the new rules before the next game
-    const R=$('overRules');R.hidden=false;R.disabled=false;R.onclick=()=>{R.disabled=true;netCall('cfg',{ch:{lobby:1}});};}
+    const R=$('overRules');R.hidden=false;R.disabled=false;R.onclick=()=>{R.disabled=true;netCall('cfg',{ch:{lobby:1}}).then(v=>{if(v&&v.room&&v.room.st==='lobby')return;R.disabled=false;
+      gToast(v&&v.err==='not now'?'Секунду: сервер ещё подводит итоги партии':'Не получилось вернуться к настройкам — попробуйте ещё раз');});};}
   else{main.textContent='Ждём хозяина стола…';main.disabled=true;}
   alt.textContent='Выйти из-за стола';alt.onclick=()=>{modal('over',false);netLeave();};}
 function netLeave(to){const quick=!!(net.room&&net.room.q),solo=!!(net.room&&net.room.solo);const code=net.code;if(code)netReq('leave');netStopLoop();
