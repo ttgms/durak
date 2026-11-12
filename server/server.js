@@ -495,7 +495,7 @@ function freshEco(){return {coins:0,owned:['gzhel','sukno','classic'],back:'gzhe
   camp:{},daily:{day:'',done:false},gift:{day:'',streak:0},ach:{},iap:{},iapDone:{},xp:0,lvl:1,
   st:{games:0,wins:0,losses:0,draws:0,streak:0,bestStreak:0,pogGiven:0,pogGot:0,noTakeWins:0,transfers:0,takes:0,firstOuts:0,bigWins:0,sixWins:0,win54:0,dailyCount:0,coinsEarned:0,
       byMode:{podkidnoy:{g:0,w:0},perevodnoy:{g:0,w:0}},byDeck:{36:{g:0,w:0},54:{g:0,w:0}},byPlayers:{}}};}
-const ECO_KEYS=['xp','lvl','coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail'];
+const ECO_KEYS=['xp','lvl','coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail','inbox','nid','seen'];
 // levels grow with every game played and never go down; a new level brings coins
 function xpFor(L){return 25*(L-1)*L;} // experience needed to reach level L: 50, 150, 300, 500…
 const LEVEL_COINS=L=>50*L;
@@ -837,8 +837,11 @@ function profile(x){const nx=nextRank(x.r);return {r:x.r,rank:rankOf(x.r),ri:TIT
 function rateQuick(store,room,now){
   if(!room.q||!room.fin||room.fin.rated)return false;
   const res=quickResult(room,room.fin);room.fin.pay=res.pay;room.fin.pts=res.pts;room.fin.place=res.place;room.fin.rated=1;
-  room.seats.forEach((s,i)=>{if(s.k!=='h'||!s.ac)return;const x=accGet(store,s.ac,now);
-    x.r=Math.max(0,x.r+res.pts[i]);x.g++;if(res.place[i]>=0&&i!==room.fin.fool)x.w++;x.wp+=Math.max(0,res.pts[i]);x.nm=s.nm;x.t=now;accPut(store,s.ac,x);});
+  room.seats.forEach((s,i)=>{if(s.k!=='h'||!s.ac)return;const x=accGet(store,s.ac,now);const ri0=TITLES.findIndex(k=>k[1]===rankOf(x.r));
+    x.r=Math.max(0,x.r+res.pts[i]);
+    // a new rank is worth a notice, and so is a table it opens
+    const ri=TITLES.findIndex(k=>k[1]===rankOf(x.r));if(ri>ri0&&typeof note==='function'&&typeof ecoOf==='function'){const open=TIERS.filter(t=>t.need>TITLES[ri0][0]&&t.need<=x.r).map(t=>t.nm);
+      note(ecoOf(x),Object.assign({t:'rank',ri,nm:rankOf(x.r)},open.length?{open}:{}),now);}x.g++;if(res.place[i]>=0&&i!==room.fin.fool)x.w++;x.wp+=Math.max(0,res.pts[i]);x.nm=s.nm;x.t=now;accPut(store,s.ac,x);});
   room.v++;return true;}
 function topLists(store,now,me){
   const wk=weekOf(now),all=[...store.acc.entries()].filter(([,x])=>x.g>0);
@@ -862,12 +865,16 @@ function ecoOf(x){if(!x.eco){x.eco=freshEco();}return x.eco;}
 // what the browser gets: everything it needs to draw, nothing secret
 function ecoView(x,news){const e=ecoOf(x),o={};for(const k of ECO_KEYS)if(e[k]!==undefined)o[k]=e[k];
   return {eco:o,me:profile(x),news:news||[]};}
+// the player's notices: new levels and ranks, achievements, purchases, stakes given back; the newest 30 are kept
+const INBOX_MAX=30;
+function note(e,n,now){if(!e.inbox)e.inbox=[];e.nid=(e.nid||0)+1;e.inbox.push(Object.assign({id:e.nid,at:now||Date.now()},n));
+  if(e.inbox.length>INBOX_MAX)e.inbox.splice(0,e.inbox.length-INBOX_MAX);}
 function addXp(e,n,news){if(!e.lvl)e.lvl=1;e.xp=(e.xp||0)+n;
-  while(e.xp>=xpFor(e.lvl+1)){e.lvl++;const c=LEVEL_COINS(e.lvl);gain(e,c);news.push({t:'lvl',lvl:e.lvl,c});}}
+  while(e.xp>=xpFor(e.lvl+1)){e.lvl++;const c=LEVEL_COINS(e.lvl);gain(e,c);news.push({t:'lvl',lvl:e.lvl,c});note(e,{t:'lvl',lvl:e.lvl,c});}}
 function gain(e,n){e.coins+=n;e.st.coinsEarned=(e.st.coinsEarned||0)+Math.max(0,n);}
 function own(e,id){if(!e.owned.includes(id))e.owned.push(id);}
 // achievements are checked after every change and paid at once
-function payAch(e,news,now){for(const a of achDue(e)){e.ach[a.id]=now;gain(e,a.c);news.push({t:'ach',name:a.name,d:a.d,c:a.c});}}
+function payAch(e,news,now){for(const a of achDue(e)){e.ach[a.id]=now;gain(e,a.c);news.push({t:'ach',name:a.name,d:a.d,c:a.c});note(e,{t:'ach',name:a.name,d:a.d,c:a.c},now);}}
 
 // a player who played before this version brings the save from the browser once; it is taken within reason
 function migrate(e,old){if(!old||typeof old!=='object'||old.v!==2)return;
@@ -902,6 +909,7 @@ function ecoOp(store,ac,req,now){
   else if(op==='dalt'){if(!ADS_PLAT.has(plat))err='no ads';else if(e.daily&&e.daily.day===today&&e.daily.done)err='done';
     else e.dailyAlt={day:today,n:(e.dailyAlt&&e.dailyAlt.day===today?e.dailyAlt.n:0)+1};}
   else if(op==='bail'){if(e.coins>=100)err='has coins';else if(e.bail===today)err='taken';else{e.bail=today;gain(e,BAIL_COINS);res.amount=BAIL_COINS;}}
+  else if(op==='seen'){e.seen=Math.max(e.seen||0,Math.min(Math.floor(+req.id||0),e.nid||0));}
   else err='bad op';
   payAch(e,news,now);x.t=now;accPut(store,ac,x);
   return Object.assign(ecoView(x,news),res,err?{err}:{});}
@@ -1034,6 +1042,7 @@ function iapGrant(e,id,pid){if(!IAP_IDS.has(id))return false;if(!e.iapDone)e.iap
   if(id==='boyar'){own(e,'boyar');e.iap.noads=true;}
   if(id==='noads')e.iap.noads=true;
   return true;}
+function iapNote(e,id){if(typeof note==='function')note(e,{t:'buy',name:VK_PRICES[id]?VK_PRICES[id].t:id});}
 
 /* ---------- Pikabu: a purchase comes as a JWT signed (HS256) with the game's secret key ---------- */
 const b64url=buf=>buf.toString('base64').replace(/=+$/,'').replace(/\+/g,'-').replace(/\//g,'_');
@@ -1052,7 +1061,7 @@ function iapClaim(store,ac,req,now){const x=accGet(store,ac,now),e=ecoOf(x),S=st
   const pid='pk:'+String(d.purchaseId||'');const owner=store.iapUsed.get(pid);
   if(owner&&owner!==ac)return Object.assign(ecoView(x),{err:'used'});
   store.iapUsed.set(pid,ac);if(store.accDirty)store.accDirty();
-  const given=iapGrant(e,String(d.productId),pid);payAch(e,news,now);accPut(store,ac,x);
+  const given=iapGrant(e,String(d.productId),pid);if(given)iapNote(e,String(d.productId));payAch(e,news,now);accPut(store,ac,x);
   return Object.assign(ecoView(x,news),{given,productId:d.productId,consumable:!!IAP_COINS[d.productId]});}
 
 /* ---------- VK and OK: who the player is, from the signed launch parameters ---------- */
@@ -1088,7 +1097,7 @@ function vkNotify(store,p,now){const secret=(store.secrets||{}).vk;if(!secret)re
     if(p.status!=='chargeable')return {response:{order_id:Number(p.order_id),app_order_id:Number(p.order_id)}};
     const item=p.item||p.item_id;if(!VK_PRICES[item]||!/^\d+$/.test(String(p.user_id||'')))return vkErr(11,'bad order',true);
     const ac=platAcct(String(p.user_id),ok),x=accGet(store,ac,now),e=ecoOf(x),news=[];
-    iapGrant(e,item,'vk:'+p.order_id);payAch(e,news,now);accPut(store,ac,x);
+    if(iapGrant(e,item,'vk:'+p.order_id))iapNote(e,item);payAch(e,news,now);accPut(store,ac,x);
     return {response:{order_id:Number(p.order_id),app_order_id:Number(p.order_id)}};}
   return vkErr(11,'unknown notification',true);}
 function okNotify(store,q,now){const S=store.secrets||{},secret=S.ok||S.vk;
@@ -1098,7 +1107,7 @@ function okNotify(store,q,now){const S=store.secrets||{},secret=S.ok||S.vk;
   const it=VK_PRICES[q.product_code];if(!it)return xmlErr(1001,'CALLBACK_INVALID_PAYMENT : no such product');
   if(Number(q.amount)!==it.ok)return xmlErr(1001,'CALLBACK_INVALID_PAYMENT : wrong amount');
   if(!/^\d+$/.test(String(q.uid||'')))return xmlErr(1001,'CALLBACK_INVALID_PAYMENT : no user');
-  const ac=platAcct(String(q.uid),true),x=accGet(store,ac,now),e=ecoOf(x),news=[];iapGrant(e,q.product_code,'ok:'+q.transaction_id);payAch(e,news,now);accPut(store,ac,x);
+  const ac=platAcct(String(q.uid),true),x=accGet(store,ac,now),e=ecoOf(x),news=[];if(iapGrant(e,q.product_code,'ok:'+q.transaction_id))iapNote(e,q.product_code);payAch(e,news,now);accPut(store,ac,x);
   return {err:false,body:'<?xml version="1.0" encoding="UTF-8"?><callbacks_payment_response xmlns="http://api.forticom.com/1.0/">true</callbacks_payment_response>'};}
 
 
@@ -1108,7 +1117,7 @@ function okNotify(store,q,now){const S=store.secrets||{},secret=S.ok||S.vk;
 // Every change is: load, change, save-if-unchanged; on a clash the whole step is simply repeated.
 
 function rndSecure(){try{const b=require('crypto').randomBytes(4);return b.readUInt32LE(0)/4294967296;}catch(e){return Math.random();}}
-const ECO_OPS=new Set(['prof','buy','equip','gift','giftx2','adcoins','dalt','bail']);
+const ECO_OPS=new Set(['seen','prof','buy','equip','gift','giftx2','adcoins','dalt','bail']);
 const OPS=new Set(['create','join','poll','act','cfg','start','say','leave','tick','quick','me','top','solo','winx2','iap','tables','tcreate','tjoin','sweep',...ECO_OPS]);
 /* ---------- the list of open tables and who is online ---------- */
 // what the list shows of each table that waits for players or is being played; kept up to date on every change
@@ -1139,7 +1148,7 @@ async function sweep(store,now){tablesInit(store);
       const room=rec.room;if(room.seats.some(s=>s.k==='h'&&now-(s.seen||0)<STALE_MS)){track(store,room,now);break;}
       const back=room.seats.filter(s=>s.k==='h'&&s.ac&&s.paid).map(s=>[s.ac,s.paid]);
       room.st='closed';room.v++;if(!(await store.save(room,rec.ver)))continue;
-      for(const [a,p] of back)stakeBack(store,a,p,now);if(room.q.key)openDrop(room.q.key,room.code);TABLES.delete(t.code);break;}}
+      for(const [a,p] of back){stakeBack(store,a,p,now);const x=accGet(store,a,now);note(ecoOf(x),{t:'refund',c:p},now);accPut(store,a,x);}if(room.q.key)openDrop(room.q.key,room.code);TABLES.delete(t.code);break;}}
   return {ok:1};}
 // open tables that still wait for people, by kind (tier|mode|players); only a hint, every table is checked on load
 const OPEN=new Map();

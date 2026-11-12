@@ -992,7 +992,7 @@ function freshEco(){return {coins:0,owned:['gzhel','sukno','classic'],back:'gzhe
   camp:{},daily:{day:'',done:false},gift:{day:'',streak:0},ach:{},iap:{},iapDone:{},xp:0,lvl:1,
   st:{games:0,wins:0,losses:0,draws:0,streak:0,bestStreak:0,pogGiven:0,pogGot:0,noTakeWins:0,transfers:0,takes:0,firstOuts:0,bigWins:0,sixWins:0,win54:0,dailyCount:0,coinsEarned:0,
       byMode:{podkidnoy:{g:0,w:0},perevodnoy:{g:0,w:0}},byDeck:{36:{g:0,w:0},54:{g:0,w:0}},byPlayers:{}}};}
-const ECO_KEYS=['xp','lvl','coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail'];
+const ECO_KEYS=['xp','lvl','coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail','inbox','nid','seen'];
 // levels grow with every game played and never go down; a new level brings coins
 function xpFor(L){return 25*(L-1)*L;} // experience needed to reach level L: 50, 150, 300, 500…
 const LEVEL_COINS=L=>50*L;
@@ -2159,14 +2159,47 @@ function applyEco(v){if(!v||!v.eco)return v;
   if(v.now)window.__skew=v.now-Date.now();
   if(v.me){arenaMe=v.me;save.arenaRank=v.me.rank;save.arenaRi=v.me.ri;}
   ecoReady=true;persist();refreshCoins();applySkin();
-  for(const n of v.news||[]){if(n.t==='ach')toast('Достижение: '+n.name,n.d+' · +'+n.c+' монет');if(n.t==='lvl')toast('Новый уровень: '+n.lvl+'!','+'+n.c+' монет');}
-  if(!$('home').hidden)renderHome();
+  for(const n of v.news||[]){if(n.t==='ach')toast('Достижение: '+n.name,n.d+' · +'+n.c+' монет');}
+  if(!$('home').hidden)renderHome();renderBell();celebCheck();
   return v;}
 function ecoCall(op,data){return api(op,data).then(v=>{applyEco(v);if(v&&v.err==='net')gToast('Нет связи с сервером');return v;});}
 // first contact: an old save from the browser is offered once, the server keeps what is believable
 function ecoLoad(){const mig=save.migrated?null:JSON.parse(JSON.stringify(save));
   return api('prof',{mig}).then(v=>{if(v&&v.eco){save.migrated=1;applyEco(v);if(!$('home').hidden)renderHome();checkGift();renderDaily();}
     else{setTimeout(ecoLoad,4000);}return v;});}
+
+/* ---------- notices: the bell on the main menu, and a celebration for a new level or rank ---------- */
+const NOTE_IC={lvl:'⬆️',ach:'🏆',buy:'💰',refund:'↩️'};
+function noteText(n){switch(n.t){
+  case'lvl':return ['Новый уровень: '+n.lvl,'+'+fmtNum(n.c)+' монет'];
+  case'rank':return ['Новое звание: '+n.nm,n.open?'Открыт стол: '+n.open.join(', '):'Рейтинг за онлайн-столами растёт'];
+  case'ach':return ['Достижение: '+n.name,n.d+' · +'+fmtNum(n.c)+' монет'];
+  case'buy':return ['Покупка зачислена',n.name];
+  case'refund':return ['Стол закрылся до начала','Ставка '+fmtNum(n.c)+' возвращена'];}return ['',''];}
+function agoText(t){const s=Math.max(0,(Date.now()+(window.__skew||0)-t)/1000);
+  return s<60?'только что':s<3600?Math.floor(s/60)+' мин':s<86400?Math.floor(s/3600)+' ч':Math.floor(s/86400)+' дн';}
+function unseenNotes(){return (save.inbox||[]).filter(n=>n.id>(save.seen||0)).length;}
+function renderBell(){const b=$('hBellN');if(!b)return;const k=unseenNotes();b.textContent=k>9?'9+':k?String(k):'';
+  $('hBell').hidden=!(save.inbox&&save.inbox.length);}
+function openInbox(){const L=(save.inbox||[]).slice().reverse(),seen=save.seen||0;modal('inboxM',true);
+  $('inboxList').innerHTML=L.length?L.map(n=>{const [t,s]=noteText(n);return `<div class="it${n.id>seen?' new':''}"><span class="ic">${n.t==='rank'?rankBadge(n.ri,30):NOTE_IC[n.t]||'🔔'}</span><b>${esc(t)}</b><span class="tm">${agoText(n.at)}</span><small>${esc(s)}</small></div>`;}).join(''):'<div class="empty">Пока ничего нового.</div>';
+  const top=L.length?L[0].id:0;if(top>seen){save.seen=top;persist();renderBell();api('seen',{id:top});}}
+$('hBell').onclick=()=>{audio();openInbox();};
+$('inboxDone').onclick=()=>modal('inboxM',false);
+// a new level or rank gets its own little window, once, when the game in hand is over
+let celebQ=[];
+function celebCheck(){const last=save.celeb||0,all=save.inbox||[],now=Date.now()+(window.__skew||0);
+  const top=all.reduce((m,n)=>Math.max(m,n.id),0);if(top<=last)return;save.celeb=top;persist();
+  const fresh=all.filter(n=>n.id>last&&(n.t==='lvl'||n.t==='rank')&&now-n.at<86400e3);if(!fresh.length)return;
+  celebQ.push({L:fresh.filter(n=>n.t==='lvl').pop(),R:fresh.filter(n=>n.t==='rank').pop()});celebShow();}
+function celebShow(){if(!celebQ.length||!$('celebM').hidden)return;
+  if(typeof g!=='undefined'&&g&&!g.over&&!$('table').hidden){setTimeout(celebShow,1500);return;} // not in the middle of a game
+  const {L,R}=celebQ.shift();
+  if(R){$('celebPic').innerHTML=rankBadge(R.ri,110);$('celebT').textContent='Новое звание: '+R.nm+'!';
+    $('celebS').textContent=(R.open?'Теперь открыт стол: '+R.open.join(', ')+'. ':'')+(L?'А ещё новый уровень: '+L.lvl+' (+'+fmtNum(L.c)+' монет).':'');}
+  else{$('celebPic').innerHTML=`<div class="lvbig">${L.lvl}</div>`;$('celebT').textContent='Новый уровень!';$('celebS').textContent='Вы достигли '+L.lvl+' уровня. Награда: +'+fmtNum(L.c)+' монет.';}
+  modal('celebM',true);try{chime(true);}catch(e){}}
+$('celebDone').onclick=()=>{modal('celebM',false);setTimeout(celebShow,300);};
 
 /* ---------- games with bots are played at a table on the server ---------- */
 let soloCfg=null,soloBusy=false;

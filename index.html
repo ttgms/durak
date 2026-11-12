@@ -125,6 +125,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .coins{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(#3b2414,#24150b);border:1.5px solid #c9952f;border-radius:999px;padding:4px 14px 4px 5px;font:800 16px var(--ui);color:#ffe2a0;font-variant-numeric:tabular-nums;box-shadow:inset 0 1px 0 rgba(255,220,150,.25),0 3px 10px rgba(0,0,0,.4);text-shadow:0 1px 0 #000}
 .coins .coin{width:24px;height:24px}
 .tleft{display:flex;gap:8px;align-items:center}
+.starsPill,.lvlPill{white-space:nowrap}@media (max-width:420px){.tleft{gap:5px}.starsPill{padding:6px 9px;font-size:13px}.lvlPill{padding-left:9px;padding-right:9px}.lvlPill span{font-size:0}.lvlPill span::after{content:'ур.';font-size:12px}.bell{width:30px;height:30px}}
 .lvlPill{position:relative;display:inline-flex;align-items:baseline;gap:4px;padding:4px 12px 7px;border-radius:999px;background:rgba(0,0,0,.35);border:1px solid rgba(201,149,47,.6);color:#ffe2a0;font:700 12px var(--ui);overflow:hidden}
 .lvlPill b{font-size:16px}.lvlPill:empty{display:none}.lvlPill i{position:absolute;left:10px;right:10px;bottom:3px;height:3px;border-radius:2px;background:rgba(255,255,255,.15)}
 .lvlPill i::after{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--p);border-radius:2px;background:linear-gradient(90deg,#e6a828,#ffd77a)}
@@ -132,6 +133,17 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 #aRank{display:flex;align-items:center;gap:10px}
 #home nav .arena .live{display:inline-flex;align-items:center;gap:4px}
 .toplist .who{display:flex;align-items:center;gap:8px}
+.bell{position:relative;width:34px;height:34px;border-radius:50%;border:1px solid rgba(201,149,47,.6);background:rgba(0,0,0,.35);display:inline-grid;place-items:center;cursor:pointer;padding:0;vertical-align:middle}
+.bell svg{width:18px;height:18px;fill:none;stroke:#ffe2a0;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+.bell[hidden]{display:none}.bell i{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:999px;background:#e23b2e;color:#fff;font:700 11px/17px var(--ui);font-style:normal}.bell i:empty{display:none}
+.inbox{display:flex;flex-direction:column;gap:6px;margin:6px 0 14px;text-align:left;max-height:55vh;overflow-y:auto}
+.inbox .it{display:grid;grid-template-columns:34px 1fr auto;gap:2px 10px;align-items:center;padding:9px 10px;border-radius:12px;background:var(--paper2)}
+.inbox .it.new{background:#f6e2a8}.inbox .ic{grid-row:1/3;font-size:22px;text-align:center}.inbox .ic .rbadge{display:block}
+.inbox b{font-size:14px}.inbox small{grid-column:2;font-size:12px;color:var(--paper-muted)}.inbox .tm{grid-row:1;grid-column:3;font-size:11px;color:var(--paper-muted)}
+.inbox .empty{text-align:center;color:var(--paper-muted);padding:16px 0}
+.modal.celeb{z-index:700}.celeb .cpic{display:grid;place-items:center;margin:0 auto 8px;animation:celebIn .7s cubic-bezier(.2,1.5,.4,1)}
+.celeb .lvbig{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#fff1b8,#e6a828 55%,#a8701c);color:#3a2408;font:400 44px var(--display);box-shadow:0 0 0 6px rgba(230,168,40,.25),0 0 40px rgba(255,215,110,.6)}
+@keyframes celebIn{0%{transform:scale(.3) rotate(-12deg);opacity:0}100%{transform:none;opacity:1}}
 .tier .lk .rbadge{vertical-align:-4px}
 .aonline{display:inline-flex;align-items:center;gap:6px}.dot{width:8px;height:8px;border-radius:50%;background:#5fd36b;box-shadow:0 0 0 3px rgba(95,211,107,.25);display:inline-block}
 #home nav .arena .live.on:empty{display:none}
@@ -157,6 +169,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
 .cplus{display:grid;place-items:center;width:22px;height:22px;margin-left:3px;border-radius:50%;background:linear-gradient(#7fd36b,#3f9a34);color:#fff;font:900 17px/1 var(--ui);text-shadow:0 1px 0 rgba(0,0,0,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 1px 2px rgba(0,0,0,.4)}
 .coins.big .cplus{width:26px;height:26px;font-size:20px}
 .coins.big{font-size:20px;padding:5px 18px 5px 6px}.coins.big .coin{width:30px;height:30px}
+@media (max-width:420px){.coins.big{font-size:16px;padding:4px 5px 4px 4px;gap:5px}.coins.big .coin{width:24px;height:24px}.coins.big .cplus{width:22px;height:22px;font-size:17px}}@media (max-width:350px){#homeStars{display:none}}
 .coins.bump{animation:bump .5s}@keyframes bump{40%{transform:scale(1.15)}}
 .starsPill{display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,.3);border:1px solid rgba(230,180,80,.4);border-radius:999px;padding:6px 13px;font:700 14px var(--ui);color:#ffd66e}
 .coin{width:20px;height:20px;flex:none;display:inline-block;vertical-align:-4px;font-size:0;color:transparent;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><defs><radialGradient id='a' cx='.35' cy='.3' r='.8'><stop offset='0' stop-color='%23fff2bd'/><stop offset='.45' stop-color='%23f0c25a'/><stop offset='1' stop-color='%23a8701c'/></radialGradient></defs><circle cx='20' cy='20' r='19' fill='%238a5a14'/><circle cx='20' cy='20' r='17.2' fill='url(%23a)'/><circle cx='20' cy='20' r='13.5' fill='none' stroke='%23a8701c' stroke-width='1.2' stroke-dasharray='1.4 1.6'/><path d='M12.5 24.5 11.6 15l4.2 3.6L20 12l4.2 6.6 4.2-3.6-.9 9.5z' fill='%23a8701c'/><rect x='12.3' y='24.4' width='15.4' height='2.6' rx='1' fill='%23a8701c'/><circle cx='20' cy='11.2' r='1.3' fill='%23a8701c'/></svg>") center/contain no-repeat;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
@@ -410,7 +423,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
 
 <div id="home" class="screen mscreen center">
   <div class="hdeco" aria-hidden="true"><div class="band top"></div><div class="band bot"></div><div class="glow"></div></div>
-  <div class="topbar"><span class="tleft"><span class="starsPill" id="homeStars">★ 0</span><span class="lvlPill" id="homeLvl"></span></span><button class="coins big" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
+  <div class="topbar"><span class="tleft"><span class="starsPill" id="homeStars">★ 0</span><span class="lvlPill" id="homeLvl"></span><button class="bell" id="hBell" type="button" aria-label="Уведомления"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i id="hBellN"></i></button></span><button class="coins big" type="button" aria-label="Монеты — пополнить"><span class="coin">₽</span><span class="coinVal">0</span><span class="cplus" aria-hidden="true">+</span></button></div>
   <div id="fan" aria-hidden="true"></div>
   <header class="title"><h1 class="h1">Дурак</h1><p class="ribbon">Царский турнир</p></header>
   <nav>
@@ -583,6 +596,17 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
   <div class="row"><button id="giftTake" class="gold" type="button">Забрать</button><button id="giftAd" class="plain adbtn" type="button" hidden>📺 Удвоить за рекламу</button></div>
 </div></div>
 
+<div id="inboxM" class="modal" hidden><div class="p">
+  <h2>Уведомления</h2>
+  <div id="inboxList" class="inbox"></div>
+  <div class="row"><button id="inboxDone" class="gold" type="button">Закрыть</button></div>
+</div></div>
+<div id="celebM" class="modal celeb" hidden><div class="p">
+  <div class="cpic" id="celebPic"></div>
+  <h2 id="celebT"></h2>
+  <p id="celebS"></p>
+  <div class="row"><button id="celebDone" class="gold" type="button">Отлично!</button></div>
+</div></div>
 <div id="topM" class="modal" hidden><div class="p">
   <h2>Рейтинг</h2>
   <div class="seg" id="topTabs"></div>
@@ -1609,7 +1633,7 @@ function freshEco(){return {coins:0,owned:['gzhel','sukno','classic'],back:'gzhe
   camp:{},daily:{day:'',done:false},gift:{day:'',streak:0},ach:{},iap:{},iapDone:{},xp:0,lvl:1,
   st:{games:0,wins:0,losses:0,draws:0,streak:0,bestStreak:0,pogGiven:0,pogGot:0,noTakeWins:0,transfers:0,takes:0,firstOuts:0,bigWins:0,sixWins:0,win54:0,dailyCount:0,coinsEarned:0,
       byMode:{podkidnoy:{g:0,w:0},perevodnoy:{g:0,w:0}},byDeck:{36:{g:0,w:0},54:{g:0,w:0}},byPlayers:{}}};}
-const ECO_KEYS=['xp','lvl','coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail'];
+const ECO_KEYS=['xp','lvl','coins','owned','back','face','tableSkin','camp','daily','dailyAlt','gift','ach','iap','iapDone','st','adCoins','netDay','bail','inbox','nid','seen'];
 // levels grow with every game played and never go down; a new level brings coins
 function xpFor(L){return 25*(L-1)*L;} // experience needed to reach level L: 50, 150, 300, 500…
 const LEVEL_COINS=L=>50*L;
@@ -2776,14 +2800,47 @@ function applyEco(v){if(!v||!v.eco)return v;
   if(v.now)window.__skew=v.now-Date.now();
   if(v.me){arenaMe=v.me;save.arenaRank=v.me.rank;save.arenaRi=v.me.ri;}
   ecoReady=true;persist();refreshCoins();applySkin();
-  for(const n of v.news||[]){if(n.t==='ach')toast('Достижение: '+n.name,n.d+' · +'+n.c+' монет');if(n.t==='lvl')toast('Новый уровень: '+n.lvl+'!','+'+n.c+' монет');}
-  if(!$('home').hidden)renderHome();
+  for(const n of v.news||[]){if(n.t==='ach')toast('Достижение: '+n.name,n.d+' · +'+n.c+' монет');}
+  if(!$('home').hidden)renderHome();renderBell();celebCheck();
   return v;}
 function ecoCall(op,data){return api(op,data).then(v=>{applyEco(v);if(v&&v.err==='net')gToast('Нет связи с сервером');return v;});}
 // first contact: an old save from the browser is offered once, the server keeps what is believable
 function ecoLoad(){const mig=save.migrated?null:JSON.parse(JSON.stringify(save));
   return api('prof',{mig}).then(v=>{if(v&&v.eco){save.migrated=1;applyEco(v);if(!$('home').hidden)renderHome();checkGift();renderDaily();}
     else{setTimeout(ecoLoad,4000);}return v;});}
+
+/* ---------- notices: the bell on the main menu, and a celebration for a new level or rank ---------- */
+const NOTE_IC={lvl:'⬆️',ach:'🏆',buy:'💰',refund:'↩️'};
+function noteText(n){switch(n.t){
+  case'lvl':return ['Новый уровень: '+n.lvl,'+'+fmtNum(n.c)+' монет'];
+  case'rank':return ['Новое звание: '+n.nm,n.open?'Открыт стол: '+n.open.join(', '):'Рейтинг за онлайн-столами растёт'];
+  case'ach':return ['Достижение: '+n.name,n.d+' · +'+fmtNum(n.c)+' монет'];
+  case'buy':return ['Покупка зачислена',n.name];
+  case'refund':return ['Стол закрылся до начала','Ставка '+fmtNum(n.c)+' возвращена'];}return ['',''];}
+function agoText(t){const s=Math.max(0,(Date.now()+(window.__skew||0)-t)/1000);
+  return s<60?'только что':s<3600?Math.floor(s/60)+' мин':s<86400?Math.floor(s/3600)+' ч':Math.floor(s/86400)+' дн';}
+function unseenNotes(){return (save.inbox||[]).filter(n=>n.id>(save.seen||0)).length;}
+function renderBell(){const b=$('hBellN');if(!b)return;const k=unseenNotes();b.textContent=k>9?'9+':k?String(k):'';
+  $('hBell').hidden=!(save.inbox&&save.inbox.length);}
+function openInbox(){const L=(save.inbox||[]).slice().reverse(),seen=save.seen||0;modal('inboxM',true);
+  $('inboxList').innerHTML=L.length?L.map(n=>{const [t,s]=noteText(n);return `<div class="it${n.id>seen?' new':''}"><span class="ic">${n.t==='rank'?rankBadge(n.ri,30):NOTE_IC[n.t]||'🔔'}</span><b>${esc(t)}</b><span class="tm">${agoText(n.at)}</span><small>${esc(s)}</small></div>`;}).join(''):'<div class="empty">Пока ничего нового.</div>';
+  const top=L.length?L[0].id:0;if(top>seen){save.seen=top;persist();renderBell();api('seen',{id:top});}}
+$('hBell').onclick=()=>{audio();openInbox();};
+$('inboxDone').onclick=()=>modal('inboxM',false);
+// a new level or rank gets its own little window, once, when the game in hand is over
+let celebQ=[];
+function celebCheck(){const last=save.celeb||0,all=save.inbox||[],now=Date.now()+(window.__skew||0);
+  const top=all.reduce((m,n)=>Math.max(m,n.id),0);if(top<=last)return;save.celeb=top;persist();
+  const fresh=all.filter(n=>n.id>last&&(n.t==='lvl'||n.t==='rank')&&now-n.at<86400e3);if(!fresh.length)return;
+  celebQ.push({L:fresh.filter(n=>n.t==='lvl').pop(),R:fresh.filter(n=>n.t==='rank').pop()});celebShow();}
+function celebShow(){if(!celebQ.length||!$('celebM').hidden)return;
+  if(typeof g!=='undefined'&&g&&!g.over&&!$('table').hidden){setTimeout(celebShow,1500);return;} // not in the middle of a game
+  const {L,R}=celebQ.shift();
+  if(R){$('celebPic').innerHTML=rankBadge(R.ri,110);$('celebT').textContent='Новое звание: '+R.nm+'!';
+    $('celebS').textContent=(R.open?'Теперь открыт стол: '+R.open.join(', ')+'. ':'')+(L?'А ещё новый уровень: '+L.lvl+' (+'+fmtNum(L.c)+' монет).':'');}
+  else{$('celebPic').innerHTML=`<div class="lvbig">${L.lvl}</div>`;$('celebT').textContent='Новый уровень!';$('celebS').textContent='Вы достигли '+L.lvl+' уровня. Награда: +'+fmtNum(L.c)+' монет.';}
+  modal('celebM',true);try{chime(true);}catch(e){}}
+$('celebDone').onclick=()=>{modal('celebM',false);setTimeout(celebShow,300);};
 
 /* ---------- games with bots are played at a table on the server ---------- */
 let soloCfg=null,soloBusy=false;
