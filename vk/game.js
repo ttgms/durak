@@ -2108,21 +2108,22 @@ $('aNew').onclick=()=>{audio();const F=save.arena.filt,t=F&&F!=='all'&&arenaTier
   if(t&&(arenaMe?arenaMe.r:0)>=t.need)save.arena.c.tier=t.id; // the table the player was looking at
   createOpen=true;renderCreate();};
 $('cCancel').onclick=()=>{createOpen=false;renderCreate();};
-$('cGo').onclick=()=>{audio();const c=save.arena.c,t=arenaTier(c.tier);if(!stakeOk(t))return;
+$('cGo').onclick=()=>{audio();const c=save.arena.c,t=arenaTier(c.tier);if(!stakeOk(t,$('cMsg')))return;
   const rules={};for(const [k] of TABLE_RULE_CHIPS)if(c.rules[k])rules[k]=true;
   $('aMsg').textContent='Ставим стол…';
   netReq('tcreate',{acct:myAcct(),name:arenaName(),tier:t.id,mode:c.mode,n:c.n,deck:c.deck,rules}).then(v=>{createOpen=false;arenaEnter(v);});};
 function tableSit(code){const t=tablesV&&tablesV.tables.find(x=>x.code===code);if(t&&!stakeOk(arenaTier(t.tier)))return;
   $('aMsg').textContent='Садимся…';netReq('tjoin',{acct:myAcct(),name:arenaName(),code}).then(v=>{if(v&&v.err==='gone'){$('aMsg').textContent='За этим столом уже нет места.';api('tables').then(x=>{if(x&&x.tables){tablesV=x;renderTables();}});return;}arenaEnter(v);});}
 // enough coins for the stake? if not, say what to do
-function stakeOk(t){const msg=$('aMsg');msg.textContent='';
+function stakeOk(t,el){const msg=el||$('aMsg');$('aMsg').textContent='';$('cMsg').textContent='';
   if(!NET_API){msg.textContent='Онлайн-столы скоро заработают.';return false;}
   if(save.coins>=t.stake)return true;
   const d=dayKey(),canBail=save.coins<ARENA_TIERS[0].stake&&(!save.bail||save.bail!==d);
-  if(canBail){msg.innerHTML=`Монеты закончились. <button class="plain sm" type="button" id="aBail">Взять ${BAIL} на игру</button>`;
+  if(canBail){msg.innerHTML=`Не хватает монет на ставку: нужно ${fmtNum(t.stake)}, у вас ${fmtNum(save.coins)}. <button class="plain sm" type="button" id="aBail">Взять ${BAIL} бесплатно</button>`;
     $('aBail').onclick=()=>{ecoCall('bail').then(v=>{if(v.amount){coinSnd();msg.textContent=`+${v.amount} монет — удачи за столом!`;}else msg.textContent='Сегодня монеты уже выдавали.';});};}
-  else{msg.innerHTML=`Для этого стола нужно ${fmtNum(t.stake)} монет.`+(window.__PF&&window.__PF.store?' <button class="plain sm" type="button" id="aBuy">В казну</button>':' Сыграйте за столом попроще.');
+  else{msg.innerHTML=`Не хватает монет на ставку: нужно ${fmtNum(t.stake)}, у вас ${fmtNum(save.coins)}.`+(window.__PF&&window.__PF.store?' <button class="plain sm" type="button" id="aBuy">В казну</button>':' Сыграйте за столом попроще.');
     const b=$('aBuy');if(b)b.onclick=()=>{shopTab='iap';show('shop');};}
+  try{msg.scrollIntoView({block:'center',behavior:'smooth'});}catch(e){}
   return false;}
 // a seat was given (or not): to the lobby of that table
 function arenaEnter(v){

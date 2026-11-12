@@ -154,7 +154,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .acreate{width:100%;padding:14px;display:flex;flex-direction:column;gap:10px;align-items:center}.acreate h4{margin:0;font:400 22px var(--display)}
 .acreate .seg{background:rgba(0,0,0,.08)}.acreate .seg button{color:var(--paper-muted)}.acreate .seg button[aria-pressed="true"]{background:#3a2a18;color:#fff3dc}
 .acreate .seg.chips button[aria-pressed="true"]{background:#e6b450;color:#3a2408}.acreate .opt .lbl{color:#8a6a44}.acreate .plain{background:#e3d6bd;color:#3a2a18;border-color:transparent}
-.acreate .seg button:disabled{opacity:.45}#cTier{flex-wrap:wrap;justify-content:center}#cTier button{display:flex;flex-direction:column;line-height:1.15}#cTier small{font-size:11px;opacity:.8}.acreate .chint{margin:0;font-size:12px;color:var(--paper-muted);text-align:center}.acreate .row{display:flex;gap:10px}
+.acreate .seg button:disabled{opacity:.45}#cTier{flex-wrap:wrap;justify-content:center}#cTier button{display:flex;flex-direction:column;line-height:1.15}#cTier small{font-size:11px;opacity:.8}.acreate .cmsg{margin:0;font-size:14px;color:#a8541c;text-align:center;font-weight:600}.acreate .cmsg:empty{display:none}.acreate .chint{margin:0;font-size:12px;color:var(--paper-muted);text-align:center}.acreate .row{display:flex;gap:10px}
 #aList{display:flex;flex-direction:column;gap:10px;width:100%}
 .trow{display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:12px 14px;align-items:center}
 .trow .tt{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.trow .tt b{font:400 19px var(--display)}.trow .tt .stk{font-weight:700;color:#a8541c;font-size:14px}
@@ -508,6 +508,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
         <div class="opt"><span class="lbl">Колода</span><div class="seg" id="cDeck"></div></div>
         <div class="opt"><span class="lbl">Особые правила</span><div class="seg chips" id="cRules"></div></div>
         <div class="row"><button id="cGo" class="gold" type="button">Создать</button><button id="cCancel" class="plain" type="button">Отмена</button></div>
+        <p id="cMsg" class="cmsg" aria-live="polite"></p>
         <p class="chint">Стол появится в списке. Начните, когда соберутся игроки, — пустые места займут боты.</p>
       </div>
       <div id="aList"></div>
@@ -2749,21 +2750,22 @@ $('aNew').onclick=()=>{audio();const F=save.arena.filt,t=F&&F!=='all'&&arenaTier
   if(t&&(arenaMe?arenaMe.r:0)>=t.need)save.arena.c.tier=t.id; // the table the player was looking at
   createOpen=true;renderCreate();};
 $('cCancel').onclick=()=>{createOpen=false;renderCreate();};
-$('cGo').onclick=()=>{audio();const c=save.arena.c,t=arenaTier(c.tier);if(!stakeOk(t))return;
+$('cGo').onclick=()=>{audio();const c=save.arena.c,t=arenaTier(c.tier);if(!stakeOk(t,$('cMsg')))return;
   const rules={};for(const [k] of TABLE_RULE_CHIPS)if(c.rules[k])rules[k]=true;
   $('aMsg').textContent='Ставим стол…';
   netReq('tcreate',{acct:myAcct(),name:arenaName(),tier:t.id,mode:c.mode,n:c.n,deck:c.deck,rules}).then(v=>{createOpen=false;arenaEnter(v);});};
 function tableSit(code){const t=tablesV&&tablesV.tables.find(x=>x.code===code);if(t&&!stakeOk(arenaTier(t.tier)))return;
   $('aMsg').textContent='Садимся…';netReq('tjoin',{acct:myAcct(),name:arenaName(),code}).then(v=>{if(v&&v.err==='gone'){$('aMsg').textContent='За этим столом уже нет места.';api('tables').then(x=>{if(x&&x.tables){tablesV=x;renderTables();}});return;}arenaEnter(v);});}
 // enough coins for the stake? if not, say what to do
-function stakeOk(t){const msg=$('aMsg');msg.textContent='';
+function stakeOk(t,el){const msg=el||$('aMsg');$('aMsg').textContent='';$('cMsg').textContent='';
   if(!NET_API){msg.textContent='Онлайн-столы скоро заработают.';return false;}
   if(save.coins>=t.stake)return true;
   const d=dayKey(),canBail=save.coins<ARENA_TIERS[0].stake&&(!save.bail||save.bail!==d);
-  if(canBail){msg.innerHTML=`Монеты закончились. <button class="plain sm" type="button" id="aBail">Взять ${BAIL} на игру</button>`;
+  if(canBail){msg.innerHTML=`Не хватает монет на ставку: нужно ${fmtNum(t.stake)}, у вас ${fmtNum(save.coins)}. <button class="plain sm" type="button" id="aBail">Взять ${BAIL} бесплатно</button>`;
     $('aBail').onclick=()=>{ecoCall('bail').then(v=>{if(v.amount){coinSnd();msg.textContent=`+${v.amount} монет — удачи за столом!`;}else msg.textContent='Сегодня монеты уже выдавали.';});};}
-  else{msg.innerHTML=`Для этого стола нужно ${fmtNum(t.stake)} монет.`+(window.__PF&&window.__PF.store?' <button class="plain sm" type="button" id="aBuy">В казну</button>':' Сыграйте за столом попроще.');
+  else{msg.innerHTML=`Не хватает монет на ставку: нужно ${fmtNum(t.stake)}, у вас ${fmtNum(save.coins)}.`+(window.__PF&&window.__PF.store?' <button class="plain sm" type="button" id="aBuy">В казну</button>':' Сыграйте за столом попроще.');
     const b=$('aBuy');if(b)b.onclick=()=>{shopTab='iap';show('shop');};}
+  try{msg.scrollIntoView({block:'center',behavior:'smooth'});}catch(e){}
   return false;}
 // a seat was given (or not): to the lobby of that table
 function arenaEnter(v){
