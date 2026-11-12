@@ -335,6 +335,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
 .seat.out .ava::after{content:"✓";position:absolute;right:-4px;top:-4px;width:18px;height:18px;border-radius:50%;background:#2f7a46;color:#fff;font:700 11px/18px var(--ui);text-align:center}
 .seat.fool .ava::after{content:"Д";position:absolute;right:-4px;top:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font:700 11px/18px var(--display);text-align:center}
 .bubble{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--paper);color:var(--black);padding:6px 11px;border-radius:12px;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.35);transition:opacity .2s,scale .2s;z-index:2;pointer-events:none}
+.bubble.mine{position:absolute;z-index:320;transform:none;border-bottom-left-radius:3px}
 .seat:not(.col) .bubble{left:calc(var(--av,52px) + 14px);top:calc(var(--av,52px) - 4px);transform:none;border-top-left-radius:3px}
 .bubble.off{opacity:0;scale:.6}
 .seat.col .bubble{white-space:normal;width:max-content;max-width:150px;text-align:center}
@@ -654,7 +655,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
   function log(){try{console.log('[pkb]',[].slice.call(arguments).join(' '));}catch(e){}}
   var started=false;
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794449033';s.onload=function(){};document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794449773';s.onload=function(){};document.body.appendChild(s);}
   // with no SDK (opened outside Pikabu, or it failed) the game still starts, just without the shop and ads
   var fallback=setTimeout(function(){log('sdk timeout');boot(null);},10000);
   // a purchase is shown to our server as Pikabu signed it; the server checks the signature and gives the goods

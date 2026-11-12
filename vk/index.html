@@ -335,6 +335,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
 .seat.out .ava::after{content:"✓";position:absolute;right:-4px;top:-4px;width:18px;height:18px;border-radius:50%;background:#2f7a46;color:#fff;font:700 11px/18px var(--ui);text-align:center}
 .seat.fool .ava::after{content:"Д";position:absolute;right:-4px;top:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;font:700 11px/18px var(--display);text-align:center}
 .bubble{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--paper);color:var(--black);padding:6px 11px;border-radius:12px;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.35);transition:opacity .2s,scale .2s;z-index:2;pointer-events:none}
+.bubble.mine{position:absolute;z-index:320;transform:none;border-bottom-left-radius:3px}
 .seat:not(.col) .bubble{left:calc(var(--av,52px) + 14px);top:calc(var(--av,52px) - 4px);transform:none;border-top-left-radius:3px}
 .bubble.off{opacity:0;scale:.6}
 .seat.col .bubble{white-space:normal;width:max-content;max-width:150px;text-align:center}
@@ -660,7 +661,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
   var PRICES={noads:[35,249],starter:[21,149],boyar:[57,399],coins3000:[14,99],coins10000:[35,249],coins30000:[79,549],coins100000:[199,1390]};
   function votes(n){var a=n%10,b=n%100;return n+' '+(a===1&&b!==11?'голос':a>=2&&a<=4&&(b<12||b>14)?'голоса':'голосов');}
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794449033';document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794449773';document.body.appendChild(s);}
   var fallback=setTimeout(function(){log('bridge timeout');boot(null);},8000);
   if(!B){clearTimeout(fallback);boot(null);return;}
   function send(m,p){return B.send(m,p||{});}

@@ -1563,7 +1563,11 @@ function timeUp(){if(!g||g.over||g.toMove()!==0||NET)return;pending=null;
   else g.done(0);
   gToast('Время вышло');afterAction();}
 function gToast(t){const el=$('toast');el.textContent=t;el.classList.remove('on');void el.offsetWidth;el.classList.add('on');}
-// a card shown for a moment over a player's seat (shown trump)
+// my own phrase at the table: a speech bubble just above my cards, like the others' at their seats
+let myBubT=0;
+function sayMine(t){let b=$('meBubble');if(!b){b=document.createElement('div');b.id='meBubble';b.className='bubble mine off';table.appendChild(b);}
+  const sp=Math.min(W*.5,CW*.78*Math.max(0,g.hands[0].length-1));b.textContent=t;
+  b.style.cssText=`left:${Math.max(12,W/2-sp/2-CW/2)}px;top:${handY-44}px`;b.classList.remove('off');clearTimeout(myBubT);myBubT=setTimeout(()=>b.classList.add('off'),2300);}
 // a shown trump: big in the middle of the table for a moment, with who showed it
 function flashCard(c,p){const w=Math.round(CW*1.6),h=Math.round(CH*1.6);
   const d=document.createElement('div');d.className='flash big';d.style.cssText=`left:${W/2-w/2}px;top:${H*.42-h/2}px;width:${w}px`;
@@ -1897,7 +1901,7 @@ function netTimer(){const el=$('tmr');
 function refreshNetSeats(){if(!NET||!g||!net.room)return;
   for(let q=1;q<g.n;q++){const el=$('seat'+q);if(!el)continue;const s=net.room.seats[(q+net.room.me)%g.n];el.classList.toggle('away',!!(s&&s.k==='h'&&s.away));}}
 function netSay(c){const q=net.room?(c.p-net.room.me+net.room.seats.length)%net.room.seats.length:-1,t=PHRASES[c.k]||'';
-  if(!t)return;if(NET&&g){if(q===0)gToast(t);else say(q,t);}
+  if(!t)return;if(NET&&g){if(q===0)sayMine(t);else say(q,t);}
   else{const el=$('lChat');if(el){const s=net.room.seats[c.p];el.textContent=(s&&s.nm?s.nm:'Игрок')+': '+t;el.classList.remove('on');void el.offsetWidth;el.classList.add('on');}}}
 function netReward(win){const o={coins:0,rw:[]};
   if(!win)return o;
