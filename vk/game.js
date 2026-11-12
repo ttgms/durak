@@ -2076,11 +2076,13 @@ function renderOnline(){if(!tablesV)return;$('aOnline').innerHTML=onlineText(tab
   const h=$('hOnline');if(h)h.innerHTML=`<span class="dot"></span>${fmtNum(tablesV.online)}`;}
 function renderTables(){
   const F=save.arena.filt||'all';
-  segButtons($('aFilt'),[['all','Все'],...ARENA_TIERS.map(t=>[t.id,t.nm])],F,v=>{save.arena.filt=v;persist();renderTables();});
+  const r0=arenaMe?arenaMe.r:0;
+  segButtons($('aFilt'),[['all','Все'],...ARENA_TIERS.map(t=>[t.id,(r0<t.need?'🔒 ':'')+t.nm])],F,v=>{save.arena.filt=v;persist();renderTables();});
   renderCreate();
   const box=$('aList');if(!NET_API){box.innerHTML='<div class="empty">Онлайн-столы скоро заработают.</div>';return;}
   if(!tablesV){box.innerHTML='<div class="empty">Загружаем столы…</div>';return;}
   const r=arenaMe?arenaMe.r:0,list=tablesV.tables.filter(t=>F==='all'||t.tier===F);
+  const FT=F!=='all'&&arenaTier(F);if(FT&&r<FT.need&&!list.length){box.innerHTML=`<div class="empty">${FT.nm} стол (ставка ${fmtNum(FT.stake)}) откроется со звания ${rankBadge(rankIndex(FT.need),18)} «${titleOf(FT.need)}». Играйте за столами попроще, чтобы поднять рейтинг.</div>`;return;}
   if(!list.length){box.innerHTML=`<div class="empty">Свободных столов ${F==='all'?'пока нет':'с такой ставкой нет'}. Создайте свой — или нажмите «Быстрая игра».</div>`;return;}
   box.innerHTML=list.map(t=>{const T=arenaTier(t.tier),lock=r<T.need,play=t.st==='play',ppl=t.seats.filter(s=>s.k==='h').length;
     const rl=ruleNames(t.rules),mine=net.code===t.code;
@@ -2093,7 +2095,8 @@ function renderTables(){
 function renderCreate(){const P=$('aCreate');P.hidden=!createOpen;$('aNew').hidden=createOpen;if(!createOpen)return;
   const c=save.arena.c,r=arenaMe?arenaMe.r:0,maxN=c.deck===24?4:4;
   const re=()=>{persist();renderCreate();};
-  segButtons($('cTier'),ARENA_TIERS.map(t=>[t.id,fmtNum(t.stake),r<t.need]),c.tier,v=>{c.tier=v;re();});
+  if(r<arenaTier(c.tier).need)c.tier='fair';
+  segButtons($('cTier'),ARENA_TIERS.map(t=>[t.id,`${r<t.need?'🔒 ':''}${t.nm} <small>${fmtNum(t.stake)}</small>`,r<t.need]),c.tier,v=>{c.tier=v;re();});
   segButtons($('cMode'),[['podkidnoy','Подкидной'],['perevodnoy','Переводной']],c.mode,v=>{c.mode=v;re();});
   segButtons($('cN'),[2,3,4].map(k=>[k,String(k),k>maxN]),c.n,v=>{c.n=v;re();});
   segButtons($('cDeck'),[[24,'24'],[36,'36'],[52,'52']],c.deck,v=>{c.deck=v;re();});
@@ -2101,7 +2104,9 @@ function renderCreate(){const P=$('aCreate');P.hidden=!createOpen;$('aNew').hidd
   $('cRules').innerHTML=TABLE_RULE_CHIPS.map(([k,t])=>`<button type="button" aria-pressed="${!!c.rules[k]&&!need[k]}" ${need[k]?'disabled':''} data-k="${k}">${t}${need[k]?` <small>(${need[k]})</small>`:''}</button>`).join('');
   $('cRules').querySelectorAll('button').forEach(b=>b.onclick=()=>{c.rules[b.dataset.k]=!c.rules[b.dataset.k];re();});
   $('cGo').textContent=`Создать — ставка ${fmtNum(arenaTier(c.tier).stake)}`;}
-$('aNew').onclick=()=>{audio();createOpen=true;renderCreate();};
+$('aNew').onclick=()=>{audio();const F=save.arena.filt,t=F&&F!=='all'&&arenaTier(F);
+  if(t&&(arenaMe?arenaMe.r:0)>=t.need)save.arena.c.tier=t.id; // the table the player was looking at
+  createOpen=true;renderCreate();};
 $('cCancel').onclick=()=>{createOpen=false;renderCreate();};
 $('cGo').onclick=()=>{audio();const c=save.arena.c,t=arenaTier(c.tier);if(!stakeOk(t))return;
   const rules={};for(const [k] of TABLE_RULE_CHIPS)if(c.rules[k])rules[k]=true;

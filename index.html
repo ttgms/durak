@@ -142,7 +142,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .acreate{width:100%;padding:14px;display:flex;flex-direction:column;gap:10px;align-items:center}.acreate h4{margin:0;font:400 22px var(--display)}
 .acreate .seg{background:rgba(0,0,0,.08)}.acreate .seg button{color:var(--paper-muted)}.acreate .seg button[aria-pressed="true"]{background:#3a2a18;color:#fff3dc}
 .acreate .seg.chips button[aria-pressed="true"]{background:#e6b450;color:#3a2408}.acreate .opt .lbl{color:#8a6a44}.acreate .plain{background:#e3d6bd;color:#3a2a18;border-color:transparent}
-.acreate .seg button:disabled{opacity:.35}.acreate .chint{margin:0;font-size:12px;color:var(--paper-muted);text-align:center}.acreate .row{display:flex;gap:10px}
+.acreate .seg button:disabled{opacity:.45}#cTier{flex-wrap:wrap;justify-content:center}#cTier button{display:flex;flex-direction:column;line-height:1.15}#cTier small{font-size:11px;opacity:.8}.acreate .chint{margin:0;font-size:12px;color:var(--paper-muted);text-align:center}.acreate .row{display:flex;gap:10px}
 #aList{display:flex;flex-direction:column;gap:10px;width:100%}
 .trow{display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:12px 14px;align-items:center}
 .trow .tt{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.trow .tt b{font:400 19px var(--display)}.trow .tt .stk{font-weight:700;color:#a8541c;font-size:14px}
@@ -2693,11 +2693,13 @@ function renderOnline(){if(!tablesV)return;$('aOnline').innerHTML=onlineText(tab
   const h=$('hOnline');if(h)h.innerHTML=`<span class="dot"></span>${fmtNum(tablesV.online)}`;}
 function renderTables(){
   const F=save.arena.filt||'all';
-  segButtons($('aFilt'),[['all','Все'],...ARENA_TIERS.map(t=>[t.id,t.nm])],F,v=>{save.arena.filt=v;persist();renderTables();});
+  const r0=arenaMe?arenaMe.r:0;
+  segButtons($('aFilt'),[['all','Все'],...ARENA_TIERS.map(t=>[t.id,(r0<t.need?'🔒 ':'')+t.nm])],F,v=>{save.arena.filt=v;persist();renderTables();});
   renderCreate();
   const box=$('aList');if(!NET_API){box.innerHTML='<div class="empty">Онлайн-столы скоро заработают.</div>';return;}
   if(!tablesV){box.innerHTML='<div class="empty">Загружаем столы…</div>';return;}
   const r=arenaMe?arenaMe.r:0,list=tablesV.tables.filter(t=>F==='all'||t.tier===F);
+  const FT=F!=='all'&&arenaTier(F);if(FT&&r<FT.need&&!list.length){box.innerHTML=`<div class="empty">${FT.nm} стол (ставка ${fmtNum(FT.stake)}) откроется со звания ${rankBadge(rankIndex(FT.need),18)} «${titleOf(FT.need)}». Играйте за столами попроще, чтобы поднять рейтинг.</div>`;return;}
   if(!list.length){box.innerHTML=`<div class="empty">Свободных столов ${F==='all'?'пока нет':'с такой ставкой нет'}. Создайте свой — или нажмите «Быстрая игра».</div>`;return;}
   box.innerHTML=list.map(t=>{const T=arenaTier(t.tier),lock=r<T.need,play=t.st==='play',ppl=t.seats.filter(s=>s.k==='h').length;
     const rl=ruleNames(t.rules),mine=net.code===t.code;
@@ -2710,7 +2712,8 @@ function renderTables(){
 function renderCreate(){const P=$('aCreate');P.hidden=!createOpen;$('aNew').hidden=createOpen;if(!createOpen)return;
   const c=save.arena.c,r=arenaMe?arenaMe.r:0,maxN=c.deck===24?4:4;
   const re=()=>{persist();renderCreate();};
-  segButtons($('cTier'),ARENA_TIERS.map(t=>[t.id,fmtNum(t.stake),r<t.need]),c.tier,v=>{c.tier=v;re();});
+  if(r<arenaTier(c.tier).need)c.tier='fair';
+  segButtons($('cTier'),ARENA_TIERS.map(t=>[t.id,`${r<t.need?'🔒 ':''}${t.nm} <small>${fmtNum(t.stake)}</small>`,r<t.need]),c.tier,v=>{c.tier=v;re();});
   segButtons($('cMode'),[['podkidnoy','Подкидной'],['perevodnoy','Переводной']],c.mode,v=>{c.mode=v;re();});
   segButtons($('cN'),[2,3,4].map(k=>[k,String(k),k>maxN]),c.n,v=>{c.n=v;re();});
   segButtons($('cDeck'),[[24,'24'],[36,'36'],[52,'52']],c.deck,v=>{c.deck=v;re();});
@@ -2718,7 +2721,9 @@ function renderCreate(){const P=$('aCreate');P.hidden=!createOpen;$('aNew').hidd
   $('cRules').innerHTML=TABLE_RULE_CHIPS.map(([k,t])=>`<button type="button" aria-pressed="${!!c.rules[k]&&!need[k]}" ${need[k]?'disabled':''} data-k="${k}">${t}${need[k]?` <small>(${need[k]})</small>`:''}</button>`).join('');
   $('cRules').querySelectorAll('button').forEach(b=>b.onclick=()=>{c.rules[b.dataset.k]=!c.rules[b.dataset.k];re();});
   $('cGo').textContent=`Создать — ставка ${fmtNum(arenaTier(c.tier).stake)}`;}
-$('aNew').onclick=()=>{audio();createOpen=true;renderCreate();};
+$('aNew').onclick=()=>{audio();const F=save.arena.filt,t=F&&F!=='all'&&arenaTier(F);
+  if(t&&(arenaMe?arenaMe.r:0)>=t.need)save.arena.c.tier=t.id; // the table the player was looking at
+  createOpen=true;renderCreate();};
 $('cCancel').onclick=()=>{createOpen=false;renderCreate();};
 $('cGo').onclick=()=>{audio();const c=save.arena.c,t=arenaTier(c.tier);if(!stakeOk(t))return;
   const rules={};for(const [k] of TABLE_RULE_CHIPS)if(c.rules[k])rules[k]=true;
