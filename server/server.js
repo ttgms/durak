@@ -1366,11 +1366,11 @@ function broadcast(code,l0,c0,skip){const set=conns.get(code);if(!set||!set.size
     try{wsSend(sock,Object.assign(core.viewFor(room,sock.seat,l0,c0),{now,push:1,from:l0}));}catch(e){}}}
 // the server's own moves (bots, timers) when they fall due
 const timers=new Map();
-function schedule(code,due){clearTimeout(timers.get(code));if(!due)return;
+function wakeAt(code,due){clearTimeout(timers.get(code));if(!due)return;
   timers.set(code,setTimeout(()=>tick(code),Math.max(20,due-Date.now()+20)));}
 async function tick(code){timers.delete(code);const v0=verOf(code);
   const r=await core.handle(store,{op:'tick',code});if(!r||r.err)return;
-  if(verOf(code)!==v0)broadcast(code,r._l0,r._c0,null);schedule(code,r.due);}
+  if(verOf(code)!==v0)broadcast(code,r._l0,r._c0,null);wakeAt(code,r.due);}
 const strip=o=>{const r={};for(const k in o)if(k[0]!=='_')r[k]=o[k];return r;};
 async function serve(req,sock){
   if(!req||typeof req!=='object')return {err:'bad request'};if(req.op==='tick'||req.op==='sweep')return {err:'bad op'};
@@ -1382,7 +1382,7 @@ async function serve(req,sock){
     if(sock&&res.room.me!=null&&res.room.me>=0)attach(sock,code,res.room.me);
     // anything that changed the table is pushed to the others
     if(res._l0!==undefined&&res._changed)broadcast(code,res._l0,res._c0,sock);
-    schedule(code,res.due);}
+    wakeAt(code,res.due);}
   if(req.rid!=null)res.rid=req.rid;
   return strip(res);}
 // note whether a request changed the room (compare stored versions around the call)

@@ -1880,11 +1880,17 @@ function netAccused(e){const w=q=>q===0?'вас':CHR(seatChar[q]).short;
   if(e.p===0){if(e.caught){track.caught++;gToast(`Поймал! ${CHR(seatChar[e.loser]).short} забирает карты`);coinSnd();}else gToast('Обмана не было — карты забираете вы');}
   else if(e.caught)gToast(e.loser===0?`${CHR(seatChar[e.p]).short} поймал вас на обмане!`:`${CHR(seatChar[e.p]).short} поймал ${w(e.loser)}!`);
   else gToast(`${CHR(seatChar[e.p]).short} ошибся — забирает карты`);}
+// the time to move: a ring with seconds for me, a small one on the seat of whoever else is thinking
 function netTimer(){const el=$('tmr');
-  if(!NET||!g||g.over||anim||!net.room||!net.room.dl||g.toMove()!==0||!g.active(0)){if(NET)el.hidden=true;return;}
-  const left=Math.ceil((net.room.dl-(Date.now()+net.skew))/1000);
-  if(left>net.room.opts.timer){el.hidden=true;return;}
-  el.hidden=false;const v=Math.max(0,left);if(el.textContent!==String(v)){el.textContent=v;if(v<=3&&v>0)tones([[880,0,.06]],'sine',.04);}el.classList.toggle('low',v<=5);}
+  const on=NET&&g&&!g.over&&net.room&&net.room.dl&&net.room.opts.timer,tm=on?g.toMove():-1;
+  const T=on?net.room.opts.timer:0,left=on?Math.ceil((net.room.dl-(Date.now()+net.skew))/1000):0,v=Math.max(0,Math.min(T,left));
+  document.querySelectorAll('.seat .stmr').forEach(x=>{if(!on||anim||x.dataset.q!=String(tm))x.remove();});
+  if(on&&!anim&&tm>0&&left<=T){const ava=document.querySelector('#seat'+tm+' .ava');
+    if(ava){let s=ava.querySelector('.stmr');if(!s){s=document.createElement('span');s.className='stmr';s.dataset.q=tm;ava.appendChild(s);}
+      s.textContent=v;s.style.setProperty('--p',(v/T).toFixed(3));s.classList.toggle('low',v<=5);}}
+  if(!on||anim||tm!==0||!g.active(0)||left>T){if(NET)el.hidden=true;return;}
+  el.hidden=false;el.style.setProperty('--p',(v/T).toFixed(3));
+  if(el.textContent!==String(v)){el.textContent=v;if(v<=3&&v>0)tones([[880,0,.06]],'sine',.04);}el.classList.toggle('low',v<=5);}
 function refreshNetSeats(){if(!NET||!g||!net.room)return;
   for(let q=1;q<g.n;q++){const el=$('seat'+q);if(!el)continue;const s=net.room.seats[(q+net.room.me)%g.n];el.classList.toggle('away',!!(s&&s.k==='h'&&s.away));}}
 function netSay(c){const q=net.room?(c.p-net.room.me+net.room.seats.length)%net.room.seats.length:-1,t=PHRASES[c.k]||'';
