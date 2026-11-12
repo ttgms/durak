@@ -1417,16 +1417,17 @@ function measure(){W=table.clientWidth;H=table.clientHeight;PORT=W<H*.8;SHORT=!P
   CW=Math.round(PORT?Math.max(54,Math.min(W/5.3,H/7.4,100)):Math.max(54,Math.min(W/7.2,H/6.4,112)));CH=Math.round(CW*1.4);
   table.style.setProperty('--cw',CW+'px');table.style.setProperty('--ch',CH+'px');}
 // whose back a card wears: in another person's hand at an online table, theirs; everywhere else, mine
-let backOf=new Map();
+let backOf=new Map(),onTable=new Set();
 function seatBack(p){if(!NET||!net.room||!net.room.seats||p<=0)return '';const s=net.room.seats[(p+net.room.me)%net.room.seats.length];return s&&s.k==='h'&&s.bk?s.bk:'';}
-function wearBack(c,e){const want=backOf.get(c.id)||save.back||'gzhel';if(e.dataset.bk===want)return;e.dataset.bk=want;const b=e.querySelector('.b');if(b)b.innerHTML=backSVG(want);}
+function wearBack(c,e){if(onTable.has(c.id)&&e.dataset.bk)return;const want=backOf.get(c.id)||save.back||'gzhel';if(e.dataset.bk===want)return;e.dataset.bk=want;const b=e.querySelector('.b');if(b)b.innerHTML=backSVG(want);}
 function place(c,x,y,r,z,up,s){const e=els[c.id];s=s||1;if(c.ph)up=false; // a card not known yet stays face down
-  wearBack(c,e);
+  wearBack(c,e);if(drag&&drag.on&&drag.e===e)return; // held by the player: it follows the pointer, not the table
   e.style.transform=`translate(${x-CW*(1-s)/2}px,${y-CH*(1-s)/2}px) rotate(${r||0}deg) scale(${s})`;e.style.zIndex=z;e.classList.toggle('down',!up);e.classList.toggle('mini',s<1);}
 const suitIcon=s=>`<svg viewBox="0 0 10 10">${suitShape(s,5,5,10,false,RED[s]?'#e0474d':'#f6efe0')}</svg>`;
 function clean(c,...keep){const e=els[c.id];for(const k of ['stack','play','dim','target','pick'])if(!keep.includes(k))e.classList.remove(k);}
 function layout(instant){
   if(!g)return;measure();
+  onTable=new Set(g.table.flatMap(x=>x.d?[x.a.id,x.d.id]:[x.a.id]));
   backOf=new Map();for(let p=1;p<g.n;p++){const bk=seatBack(p);if(bk)for(const c of g.hands[p])backOf.set(c.id,bk);}
   const pad=Math.max(16,W*.03),hidden=new Set(masked),k=g.n-1,safeTop=16;
   const gh=ghost?new Set(ghost.flatMap(x=>x.d?[x.a,x.d]:[x.a])):new Set();
@@ -1488,7 +1489,8 @@ function layout(instant){
   else{$('status').style.cssText=`top:${hy-96}px`;$('acts').style.cssText=`top:${hy-62}px`;$('goals').style.cssText=`top:${hy-124}px`;}
   $('skipOut').style.top=(hy-62)+'px';
   if(cfg.goals)$('goals').querySelectorAll('span').forEach(s=>s.classList.toggle('fail',goalFailed(s.dataset.k)));
-  if(instant)Object.values(els).forEach(e=>{e.style.transition='none';e.offsetWidth;e.style.transition='';});
+  // straight to the places, and face up or down at once (no flight, no turning over): a new deal or the table taken again from the server
+  if(instant)Object.values(els).forEach(e=>{const i=e.firstChild;e.style.transition='none';if(i)i.style.transition='none';e.offsetWidth;e.style.transition='';if(i)i.style.transition='';});
 }
 function seatHand(p,cx,y,span,s,hidden,gh,col){
   const h=g.hands[p].filter(c=>!hidden.has(c)&&!gh.has(c)),n=h.length,w=CW*s,fog=RU.fog&&!g.over,sp=fog?Math.min(n,3)*w*.12:Math.min(col?span:W*(PORT?.42:.5),(col?w*.42:CW*.42)*Math.max(0,n-1));
@@ -1709,7 +1711,7 @@ function showOver(){
   const r={win,firstOut:g.out[0]===0,takes:track.takes,transfers:track.transfers,bouts:g.bouts,
     pogGiven:g.pogony>0&&fool>0&&track.lastOuts.includes(0)&&(g.lastPlayed[0]||[]).some(c=>c.r==='6'),pogGot:g.pogony>0&&fool===0};
   const rw=SV?SV.rw.slice():['Результат не пришёл — проверьте связь'];const coins=SV?SV.coins:0,starsShow=SV&&SV.stars?SV.stars:null;
-  if(solo&&SV)applyEco({eco:SV.eco,news:SV.news});else{if(SV)for(const x of SV.news||[])toast('Достижение: '+x.name,x.d+' · +'+x.c+' монет');api('prof').then(applyEco);}
+  if(solo&&SV)applyEco({eco:SV.eco,news:SV.news});else{if(SV)for(const x of SV.news||[])if(x.t==='ach')toast('Достижение: '+x.name,x.d+' · +'+x.c+' монет');api('prof').then(applyEco);}
   lastWin=win&&coins>0&&solo?coins:0;
   persist();
   // texts

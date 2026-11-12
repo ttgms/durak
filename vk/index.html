@@ -663,7 +663,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
   var PRICES={noads:[35,249],starter:[21,149],boyar:[57,399],coins3000:[14,99],coins10000:[35,249],coins30000:[79,549],coins100000:[199,1390]};
   function votes(n){var a=n%10,b=n%100;return n+' '+(a===1&&b!==11?'голос':a>=2&&a<=4&&(b<12||b>14)?'голоса':'голосов');}
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794454397';document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794477840';document.body.appendChild(s);}
   var fallback=setTimeout(function(){log('bridge timeout');boot(null);},8000);
   if(!B){clearTimeout(fallback);boot(null);return;}
   function send(m,p){return B.send(m,p||{});}

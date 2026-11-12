@@ -691,7 +691,9 @@ function schedule(room,now,g){
   g=g||build(room).g;if(g.over){room.dl=0;return;}
   const tm=g.toMove();
   if(controlled(room,tm)){room.dl=0;return;}
-  room.dl=room.opts.timer?room.at+room.opts.timer*1000:0;}
+  // a little more than the timer: the move before is still flying across the screen for a second or two
+  room.dl=room.opts.timer?room.at+room.opts.timer*1000+MOVE_GRACE:0;}
+const MOVE_GRACE=2000;
 function botDelay(room,g,tm){
   if(room.seats[tm].away||room.seats[tm].idle)return 700;
   // a player who is out of the game watches the rest played out quickly
@@ -1137,7 +1139,7 @@ const SEEN=new Map(); // account -> last request: "online" is everyone heard fro
 const ONLINE_MS=90000,STALE_MS=75000;
 function track(store,room,now){if(!room||!room.q)return;
   if(room.st!=='lobby'&&room.st!=='play'){TABLES.delete(room.code);return;}
-  let seen=0;const seats=room.seats.map(s=>{if(s.k!=='h')return {k:s.k};seen=Math.max(seen,s.seen||0);
+  let seen=0;const seats=room.seats.map(s=>{if(s.k!=='h')return {k:s.k};if(!s.left)seen=Math.max(seen,s.seen||0);
     const x=s.ac?store.acc.get(s.ac):null;return {k:'h',nm:s.nm,ri:x?profile(x).ri:0,lvl:x&&x.eco?x.eco.lvl:1};});
   TABLES.set(room.code,{code:room.code,tier:room.q.tier,stake:room.q.stake,list:!!room.q.list,deck:room.opts.deck,n:room.opts.n,mode:room.opts.mode,rules:room.opts.rules,
     st:room.st,host:room.host,seats,seen,born:room.born});}
@@ -1148,8 +1150,9 @@ function stampBacks(store,room){let ch=false;for(const s of room.seats){if(s.k!=
   if(typeof bk==='string'&&s.bk!==bk){s.bk=bk;ch=true;}}if(ch)room.v++;return ch;}
 function onlineCount(now){let n=0;for(const t of SEEN.values())if(now-t<ONLINE_MS)n++;return n;}
 function tableList(store,ac,now){tablesInit(store);const out=[];let playing=0;
-  for(const t of TABLES.values()){if(t.st==='play'){playing++;}
-    else if(now-t.seen>STALE_MS||!t.seats.some(s=>s.k==='o'))continue;
+  for(const t of TABLES.values()){if(now-t.seen>STALE_MS)continue; // everybody has gone: nothing to show
+    if(t.st==='play'){playing++;}
+    else if(!t.seats.some(s=>s.k==='o'))continue;
     out.push(t);}
   // waiting tables first (the fullest on top), then the ones being played
   out.sort((a,b)=>(a.st==='play')-(b.st==='play')||b.seats.filter(s=>s.k==='h').length-a.seats.filter(s=>s.k==='h').length||b.born-a.born);
@@ -1405,6 +1408,9 @@ const handle0=core.handle;core.handle=async(st,req)=>{const c=req.code?String(re
 
 // tables everybody walked away from close and give the stakes back
 setInterval(()=>{core.handle(store,{op:'sweep',_internal:1}).catch(e=>console.error('sweep',e));},30000);
+
+// rooms read back from the disk after a restart: their clocks run again (bots move, timers fire, finished games settle)
+setTimeout(()=>{let k=0;for(const code of store._m.keys())wakeAt(code,Date.now()+1000+(k++%50)*100);},3000);
 
 /* ---------- HTTP ---------- */
 const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type','Access-Control-Allow-Methods':'POST, GET, OPTIONS'};
