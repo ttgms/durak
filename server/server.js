@@ -595,6 +595,11 @@ function join(room,name,now,rnd,tok,ac){
 // host changes the table before the start: options, or a seat between "open" and "bot"
 function configure(room,tok,ch){
   if(room.q)return 'quick';
+  // after a game the host takes the table back to its settings: people stay, those who left free their seats
+  if(ch.lobby){if(seatOf(room,tok)!==room.host)return 'not host';if(room.st!=='over'||!room.fin||!room.fin.seatRes)return 'not now';
+    const hostTok=room.seats[room.host].tok;
+    room.seats=room.seats.map(s=>s.k==='h'&&s.left?{k:'o'}:s.k==='h'?Object.assign(s,{away:false,idle:false,to:0}):{k:'b'});
+    room.host=room.seats.findIndex(s=>s.tok===hostTok);room.st='lobby';room.log=[];room.fin=null;room.dl=0;room.v++;return null;}
   if(seatOf(room,tok)!==room.host||room.st==='play')return 'not host';
   if(ch.opts){const o=sanitizeOpts(Object.assign({},room.opts,ch.opts));
     const hs=room.seats.filter(s=>s.k==='h');if(o.n<hs.length)o.n=hs.length;

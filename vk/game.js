@@ -1742,7 +1742,7 @@ function showOver(){
   $('overRw').innerHTML=rw.map(x=>`<span>${x.startsWith('+')&&x.includes('монет')?'<span class="coin">₽</span>':''}${x}</span>`).join('');
   if(typeof moneyOver==='function')moneyOver(win);
   // buttons
-  const main=$('overMain'),alt=$('overAlt');
+  const main=$('overMain'),alt=$('overAlt');$('overRules').hidden=true;
   const leaveT=()=>netLeave('none');
   if(cfg.kind==='camp'){const L=LOCS[cfg.li];let next=null;
     if(win){if(cfg.si+1<L.stages.length)next=[cfg.li,cfg.si+1];else if(cfg.li+1<LOCS.length)next=[cfg.li+1,0];}
@@ -1812,7 +1812,7 @@ function netOn(v,since){
   if(!v.room)return;
   net.room=v.room;
   if(v.chat)for(const c of v.chat)if(c.i>net.cs){net.cs=c.i;netSay(c);}
-  if(v.room.st==='lobby'||v.room.st==='closed'){if(net.m){NET=false;net.m=null;clearAll();}if(v.room.st==='closed'){netGone('Хозяин закрыл стол.');return;}renderLobby();return;}
+  if(v.room.st==='lobby'||v.room.st==='closed'){if(net.m){NET=false;net.m=null;clearAll();}modal('over',false);if(v.room.st==='closed'){netGone('Хозяин закрыл стол.');return;}renderLobby();return;}
   if(v.snap){netStartGame(v.snap);return;}
   if(!net.m||v.room.game!==net.game){netResync();return;}
   if(v.log){const from=v.push?v.from:since;
@@ -1924,7 +1924,9 @@ function netOverButtons(main,alt){
     main.onclick=()=>{modal('over',false);netLeave('arena');arenaPlay(tier);};
     alt.textContent='К столам';alt.onclick=()=>{modal('over',false);netLeave('arena');};return;}
   const host=net.room.host===net.room.me;
-  if(host){main.textContent='Ещё партию';main.disabled=false;main.onclick=()=>{main.disabled=true;netCall('start');};}
+  if(host){main.textContent='Ещё партию';main.disabled=false;main.onclick=()=>{main.disabled=true;netCall('start');};
+    // the same table, back to its settings: everybody stays seated and sees the new rules before the next game
+    const R=$('overRules');R.hidden=false;R.disabled=false;R.onclick=()=>{R.disabled=true;netCall('cfg',{ch:{lobby:1}});};}
   else{main.textContent='Ждём хозяина стола…';main.disabled=true;}
   alt.textContent='Выйти из-за стола';alt.onclick=()=>{modal('over',false);netLeave();};}
 function netLeave(to){const quick=!!(net.room&&net.room.q),solo=!!(net.room&&net.room.solo);const code=net.code;if(code)netReq('leave');netStopLoop();

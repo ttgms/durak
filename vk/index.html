@@ -219,6 +219,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
 #toast{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.9);z-index:400;background:rgba(20,12,6,.88);color:#ffe2a0;border:1.5px solid #c9952f;border-radius:14px;padding:10px 18px;font:700 15px var(--ui);opacity:0;pointer-events:none;text-align:center;max-width:80%}
 #toast.on{animation:toast 2.4s ease both}@keyframes toast{0%{opacity:0;transform:translate(-50%,-50%) scale(.9)}10%,80%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0}}
 .flash{position:absolute;z-index:350;border-radius:7px;overflow:hidden;box-shadow:0 0 0 3px #e6b450,0 10px 26px rgba(0,0,0,.5);animation:flashc 1.5s ease both;pointer-events:none}.flash svg{display:block;width:100%;height:100%}
+.overrules{margin-top:10px;font-size:14px;padding:8px 16px}
 .flash.big{overflow:visible;box-shadow:none;border-radius:0;animation:flashb 2.2s ease both;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:450}
 .flash.big .fc{width:100%;border-radius:10px;overflow:hidden;box-shadow:0 0 0 4px #e6b450,0 0 44px rgba(255,215,110,.75)}.flash.big .fc svg{display:block;width:100%;height:100%}
 .flash.big .fl{font:700 15px var(--ui);color:#ffe2a0;background:rgba(0,0,0,.65);padding:6px 14px;border-radius:999px;white-space:nowrap}
@@ -577,6 +578,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
   <div id="places" hidden></div>
   <div id="overRw"></div>
   <div class="row"><button id="overMain" class="gold" type="button"></button><button id="overAlt" class="plain" type="button"></button></div>
+  <button id="overRules" class="plain overrules" type="button" hidden>Сменить правила</button>
 </div></div>
 
 <div id="pause" class="modal" hidden><div class="p">
@@ -661,7 +663,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
   var PRICES={noads:[35,249],starter:[21,149],boyar:[57,399],coins3000:[14,99],coins10000:[35,249],coins30000:[79,549],coins100000:[199,1390]};
   function votes(n){var a=n%10,b=n%100;return n+' '+(a===1&&b!==11?'голос':a>=2&&a<=4&&(b<12||b>14)?'голоса':'голосов');}
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794450938';document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794451209';document.body.appendChild(s);}
   var fallback=setTimeout(function(){log('bridge timeout');boot(null);},8000);
   if(!B){clearTimeout(fallback);boot(null);return;}
   function send(m,p){return B.send(m,p||{});}
