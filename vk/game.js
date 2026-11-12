@@ -1416,12 +1416,18 @@ let W,H,CW,CH,PORT,SHORT,handY=0;
 function measure(){W=table.clientWidth;H=table.clientHeight;PORT=W<H*.8;SHORT=!PORT&&H<520;
   CW=Math.round(PORT?Math.max(54,Math.min(W/5.3,H/7.4,100)):Math.max(54,Math.min(W/7.2,H/6.4,112)));CH=Math.round(CW*1.4);
   table.style.setProperty('--cw',CW+'px');table.style.setProperty('--ch',CH+'px');}
+// whose back a card wears: in another person's hand at an online table, theirs; everywhere else, mine
+let backOf=new Map();
+function seatBack(p){if(!NET||!net.room||!net.room.seats||p<=0)return '';const s=net.room.seats[(p+net.room.me)%net.room.seats.length];return s&&s.k==='h'&&s.bk?s.bk:'';}
+function wearBack(c,e){const want=backOf.get(c.id)||save.back||'gzhel';if(e.dataset.bk===want)return;e.dataset.bk=want;const b=e.querySelector('.b');if(b)b.innerHTML=backSVG(want);}
 function place(c,x,y,r,z,up,s){const e=els[c.id];s=s||1;if(c.ph)up=false; // a card not known yet stays face down
+  wearBack(c,e);
   e.style.transform=`translate(${x-CW*(1-s)/2}px,${y-CH*(1-s)/2}px) rotate(${r||0}deg) scale(${s})`;e.style.zIndex=z;e.classList.toggle('down',!up);e.classList.toggle('mini',s<1);}
 const suitIcon=s=>`<svg viewBox="0 0 10 10">${suitShape(s,5,5,10,false,RED[s]?'#e0474d':'#f6efe0')}</svg>`;
 function clean(c,...keep){const e=els[c.id];for(const k of ['stack','play','dim','target','pick'])if(!keep.includes(k))e.classList.remove(k);}
 function layout(instant){
   if(!g)return;measure();
+  backOf=new Map();for(let p=1;p<g.n;p++){const bk=seatBack(p);if(bk)for(const c of g.hands[p])backOf.set(c.id,bk);}
   const pad=Math.max(16,W*.03),hidden=new Set(masked),k=g.n-1,safeTop=16;
   const gh=ghost?new Set(ghost.flatMap(x=>x.d?[x.a,x.d]:[x.a])):new Set();
   const py=H-CH-Math.max(14,H*.03);handY=py;

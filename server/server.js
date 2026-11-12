@@ -770,7 +770,7 @@ function snapshotFor(room,g,s){
     chest:room.chest>=0&&room.chest<g.deck.length?room.chest:-1,logLen:room.log.length};}
 function lobbyFor(room,s){
   return {code:room.code,v:room.v,st:room.st,game:room.game,host:room.host,me:s,opts:room.opts,dl:room.dl,q:room.q||undefined,qAt:room.q?room.qAt:undefined,solo:room.solo||undefined,
-    seats:room.seats.map((x,i)=>({k:x.k,nm:x.k==='h'?x.nm:undefined,ch:x.ch,away:!!(x.away||x.idle),on:x.k==='h'&&!x.away})),
+    seats:room.seats.map((x,i)=>({k:x.k,nm:x.k==='h'?x.nm:undefined,bk:x.k==='h'?x.bk:undefined,ch:x.ch,away:!!(x.away||x.idle),on:x.k==='h'&&!x.away})),
     fin:room.fin};}
 // everything a client needs after `since` (log index) and `cs` (chat index); since<0 asks for a snapshot
 function viewFor(room,s,since,cs){
@@ -1135,6 +1135,9 @@ function track(store,room,now){if(!room||!room.q)return;
     st:room.st,host:room.host,seats,seen,born:room.born});}
 function tablesInit(store){if(tablesReady)return;tablesReady=true;if(!store._m)return;
   for(const [,rec] of store._m){try{const r=JSON.parse(rec.d);if(r.q&&(r.st==='lobby'||r.st==='play'))track(store,r,Date.now());}catch(e){}}}
+// the card back each person chose: the others see their cards with it
+function stampBacks(store,room){let ch=false;for(const s of room.seats){if(s.k!=='h'||!s.ac)continue;const x=store.acc.get(s.ac),bk=x&&x.eco&&x.eco.back;
+  if(typeof bk==='string'&&s.bk!==bk){s.bk=bk;ch=true;}}if(ch)room.v++;return ch;}
 function onlineCount(now){let n=0;for(const t of SEEN.values())if(now-t<ONLINE_MS)n++;return n;}
 function tableList(store,ac,now){tablesInit(store);const out=[];let playing=0;
   for(const t of TABLES.values()){if(t.st==='play'){playing++;}
@@ -1175,7 +1178,7 @@ async function handle(store,req,now){
   if(op==='winx2'){if(!ac)return {err:'bad acct'};return Object.assign(winDouble(store,ac,req,now),{now});}
   if(ECO_OPS.has(op)){if(!ac)return {err:'bad acct'};return Object.assign(ecoOp(store,ac,req,now),{now});}
   if(op==='create'){
-    for(let k=0;k<8;k++){const r=newRoom(req.opts,req.name,now,rndSecure,ac);
+    for(let k=0;k<8;k++){const r=newRoom(req.opts,req.name,now,rndSecure,ac);stampBacks(store,r.room);
       if(await store.create(r.room))return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now});}
     return {err:'busy'};}
   const code=normCode(req.code);if(!code)return {err:'bad code'};
@@ -1189,6 +1192,7 @@ async function handle(store,req,now){
     if(op==='join'){const r=join(room,req.name,now,rndSecure,req.tok,ac);if(r.err)return {err:r.err};seat=r.seat;tok=r.tok;}
     else{if(seat<0)return {err:'not seated'};const s=room.seats[seat];
       if(now-(s.seen||0)>15000||(s.away&&!s.left)){s.seen=now;s.away=false;room.v++;}}
+    if(!room.solo)stampBacks(store,room);
     if(op==='act')err=act(room,tok,req.m||{},now);
     else if(op==='cfg')err=configure(room,tok,req.ch||{});
     else if(op==='start')err=start(room,tok,now,rndSecure);
@@ -1226,7 +1230,7 @@ async function sitAt(store,code,req,ac,now,quick){
     // the same person twice at one table is not a game
     if(room.seats.some(s=>s.k==='h'&&s.ac===ac))return quick?null:{err:'seated'};
     const r=join(room,req.name,now,rndSecure,'',ac);if(r.err){drop();return quick?null:{err:'gone'};}
-    room.exp=now+ROOM_TTL;room.seats[r.seat].paid=t.stake;
+    room.exp=now+ROOM_TTL;room.seats[r.seat].paid=t.stake;stampBacks(store,room);
     if(!(await store.save(room,rec.ver)))continue;
     if(!stakeTake(store,ac,t.stake,now)){/* spent meanwhile: give the seat back */const rec2=await store.load(code);if(rec2){leave(rec2.room,r.tok,now);await store.save(rec2.room,rec2.ver);track(store,rec2.room,now);}return {err:'coins',need:t.stake};}
     if(!room.seats.some(s=>s.k==='o'))drop();
@@ -1236,6 +1240,7 @@ async function sitAt(store,code,req,ac,now,quick){
 async function newTable(store,o,t,req,ac,now,key,list){
   for(let k=0;k<8;k++){const r=newRoom(o,req.name,now,rndSecure,ac,Object.assign({tier:t.id,stake:t.stake,key},list?{list:1}:{}));r.room.seats[0].paid=t.stake;
     if(list)r.room.qAt=0; // waits for people until the host starts it (or it fills up)
+    stampBacks(store,r.room);
     if(await store.create(r.room)){if(!stakeTake(store,ac,t.stake,now)){r.room.st='closed';await store.save(r.room,1);return {err:'coins',need:t.stake};}
       if(key)openAdd(key,r.room.code);track(store,r.room,now);return Object.assign({tok:r.tok,seat:0},viewFor(r.room,0,-1,0),{now,due:nextDue(r.room)});}}
   return {err:'busy'};}
