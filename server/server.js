@@ -880,6 +880,8 @@ function note(e,n,now){if(!e.inbox)e.inbox=[];e.nid=(e.nid||0)+1;e.inbox.push(Ob
 function addXp(e,n,news){if(!e.lvl)e.lvl=1;e.xp=(e.xp||0)+n;
   while(e.xp>=xpFor(e.lvl+1)){e.lvl++;const c=LEVEL_COINS(e.lvl);gain(e,c);news.push({t:'lvl',lvl:e.lvl,c});note(e,{t:'lvl',lvl:e.lvl,c});}}
 function gain(e,n){e.coins+=n;e.st.coinsEarned=(e.st.coinsEarned||0)+Math.max(0,n);}
+// coins that are not earned in play: bought, handed out, a stake coming back; they do not count in the statistics
+function grant(e,n){e.coins+=n;}
 function own(e,id){if(!e.owned.includes(id))e.owned.push(id);}
 // achievements are checked after every change and paid at once
 function payAch(e,news,now){for(const a of achDue(e)){e.ach[a.id]=now;gain(e,a.c);news.push({t:'ach',name:a.name,d:a.d,c:a.c});note(e,{t:'ach',name:a.name,d:a.d,c:a.c},now);}}
@@ -916,7 +918,7 @@ function ecoOp(store,ac,req,now){
     if(e.adCoins.n>=AD_COINS_DAY)err='limit';else{e.adCoins.n++;gain(e,AD_COINS);res.amount=AD_COINS;}}}
   else if(op==='dalt'){if(!ADS_PLAT.has(plat))err='no ads';else if(e.daily&&e.daily.day===today&&e.daily.done)err='done';
     else e.dailyAlt={day:today,n:(e.dailyAlt&&e.dailyAlt.day===today?e.dailyAlt.n:0)+1};}
-  else if(op==='bail'){if(e.coins>=100)err='has coins';else if(e.bail===today)err='taken';else{e.bail=today;gain(e,BAIL_COINS);res.amount=BAIL_COINS;}}
+  else if(op==='bail'){if(e.coins>=100)err='has coins';else if(e.bail===today)err='taken';else{e.bail=today;grant(e,BAIL_COINS);res.amount=BAIL_COINS;}}
   else if(op==='seen'){e.seen=Math.max(e.seen||0,Math.min(Math.floor(+req.id||0),e.nid||0));}
   else err='bad op';
   payAch(e,news,now);x.t=now;accPut(store,ac,x);
@@ -1016,17 +1018,18 @@ const FRIEND_WIN=30,FRIEND_WINS_DAY=5;
 function settleNet(store,room,now){
   if(room.solo||!room.fin||room.fin.seatRes)return false;const out=[];
   room.seats.forEach((s,i)=>{if(s.k!=='h'||!s.ac){out.push(null);return;}
-    const x=accGet(store,s.ac,now),e=ecoOf(x),r=soloFacts(room,i),rw=[],news=[];let coins=0;addStats(e,r);
-    if(room.q){const pay=(room.fin.pay||[])[i]||0,pts=(room.fin.pts||[])[i]||0;coins+=pay;
+    const x=accGet(store,s.ac,now),e=ecoOf(x),r=soloFacts(room,i),rw=[],news=[];let coins=0,back=0;addStats(e,r);
+    // at a table with a stake only what comes on top of the stake is earned; the stake itself just comes back
+    if(room.q){const pay=(room.fin.pay||[])[i]||0,pts=(room.fin.pts||[])[i]||0;back=Math.min(pay,room.q.stake);coins+=pay-back;
       if(!pay)rw.push('Ставка '+room.q.stake+' проиграна');if(pts)rw.push('Рейтинг '+(pts>0?'+':'')+pts);}
     else if(r.win&&room.seats.filter(z=>z.k==='h').length>=2){const d=dayOf(now);if(!e.netDay||e.netDay.d!==d)e.netDay={d,w:0};
       if(e.netDay.w<FRIEND_WINS_DAY){e.netDay.w++;coins+=FRIEND_WIN;}else rw.push('Монеты за победы над друзьями — до 5 раз в день');}
     if(r.win&&!e.owned.includes('skaz')){own(e,'skaz');rw.push('Колода «Сказочная»');}
     if(r.chest){coins+=CHEST_COINS;rw.push('Клад +'+CHEST_COINS);}
     if(r.caught){coins+=r.caught*CAUGHT_COINS;rw.push('Пойман шулер ×'+r.caught+': +'+r.caught*CAUGHT_COINS);}
-    if(coins){gain(e,coins);rw.unshift('+'+coins+' монет');}
+    if(back)grant(e,back);if(coins)gain(e,coins);if(coins+back)rw.unshift('+'+(coins+back)+' монет');
     const xp=15+(r.win?20:0);addXp(e,xp,news);rw.push('Опыт +'+xp);
-    payAch(e,news,now);accPut(store,s.ac,x);out.push({coins,rw,news});});
+    payAch(e,news,now);accPut(store,s.ac,x);out.push({coins:coins+back,rw,news});});
   room.fin.seatRes=out;room.v++;return true;}
 // a seat at an open table costs the stake at once; leaving before the start gives it back
 function stakeTake(store,ac,stake,now){const x=accGet(store,ac,now),e=ecoOf(x);if(e.coins<stake)return false;e.coins-=stake;accPut(store,ac,x);return true;}
@@ -1044,9 +1047,9 @@ const IAP_IDS=new Set(['noads','starter','boyar','coins3000','coins10000','coins
 // what a product gives; permanent ones once, coin packs once per purchase
 function iapGrant(e,id,pid){if(!IAP_IDS.has(id))return false;if(!e.iapDone)e.iapDone={};if(!e.iap)e.iap={};
   if(pid&&e.iapDone[pid])return false;
-  if(IAP_COINS[id]){if(pid)e.iapDone[pid]=1;gain(e,IAP_COINS[id]);return true;}
+  if(IAP_COINS[id]){if(pid)e.iapDone[pid]=1;grant(e,IAP_COINS[id]);return true;}
   if(pid)e.iapDone[pid]=1;if(e.iap[id])return false;e.iap[id]=true;
-  if(id==='starter'){gain(e,2000);own(e,'gorodets');own(e,'russ');}
+  if(id==='starter'){grant(e,2000);own(e,'gorodets');own(e,'russ');}
   if(id==='boyar'){own(e,'boyar');e.iap.noads=true;}
   if(id==='noads')e.iap.noads=true;
   return true;}
