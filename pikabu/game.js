@@ -58,7 +58,7 @@ G.limitBase=function(){return this.rules.noLimit?99:this.firstBout?5:6;};
 G.ranksOnTable=function(){const s=new Set();for(const p of this.table){s.add(p.a.r);if(p.d)s.add(p.d.r);}return s;};
 G.undefended=function(){return this.table.filter(p=>!p.d);};
 G.startBout=function(){
-  this.table=[];this.taking=false;this.passed=new Set();this.shown=new Set();
+  this.table=[];this.taking=false;this.passed=new Set();if(!this.shown)this.shown=new Set(); // a trump may be shown only once a game
   for(let p=0;p<this.n;p++)this.played[p]=[];
   this.limit=Math.min(this.limitBase(),this.hands[this.def].length);
   this.events.push({t:'bout',att:this.att,def:this.def});
@@ -86,7 +86,7 @@ G.canTransfer=function(p,c){
   const n=this.table.length+1;
   return n<=this.limitBase()&&this.hands[this.transferTarget()].length>=n;
 };
-// show a trump of the table's rank instead of laying a card: the attack moves on, the trump stays in hand
+// show a trump of the table's rank instead of laying a card: the attack moves on, the trump stays in hand (each trump once a game)
 G.canShow=function(p,c){
   if(this.over||this.mode!=='perevodnoy'||!this.rules.show||p!==this.def||this.taking||!this.has(p,c)||!this.isTrump(c)||this.shown.has(c.id))return false;
   if(!this.table.length||this.table.some(x=>x.d||x.a.r!==c.r))return false;
@@ -1427,7 +1427,10 @@ function layout(instant){
   let topBottom;
   if(k===1){
     const botY=PORT?92:78-CH*.55;topBottom=botY+CH;
-    const seat=$('seat1');seat.style.cssText=`left:${pad}px;top:${safeTop}px;--av:52px`;
+    // the opponent sits right by the cards when there is room, otherwise in the corner
+    const seat=$('seat1'),n1=Math.max(6,g.hands[1].length),sp1=Math.min(W*(PORT?.42:.5),CW*.42*(n1-1)),handL=W/2-sp1/2-CW/2;
+    seat.style.cssText=`left:${pad}px;top:${safeTop}px;--av:52px`;const sw1=seat.offsetWidth,sh1=seat.offsetHeight;
+    if(handL-sw1-16>=pad)seat.style.cssText=`left:${handL-sw1-16}px;top:${Math.max(safeTop,botY+CH/2-sh1/2)}px;--av:52px`;
     seatHand(1,W/2,botY,0,1,hidden,gh,false);
   }else{
     const av=PORT?38:46,sw=Math.min(130,(W-2*pad)/k),seatTop=54,s=PORT?(k>=4?.32:.4):Math.min(.55,sw/(CW*1.6)),gap=PORT?44:44;
@@ -1530,10 +1533,8 @@ function updateControls(){
     // throw-ins go strictly in turn (attacker first, then clockwise); the game always waits for you
     const th=g.throwers(),meLater=g.def!==0&&!g.passed.has(0)&&th.indexOf(0)>th.indexOf(tm),then=meLater&&tm!==g.def?' Потом ваша очередь.':'';
     const more=myRun&&g.def!==0&&g.hands[0].some(c=>g.canAttack(0,c));
-    st.textContent=tm===g.def&&tm!==0?`${who(tm)} отбивается…`+(more?' Можно подкинуть ещё':'')
-      :!g.table.length?`${who(tm)} ходит…`
-      :g.taking?`${who(g.def)} берёт, ${who(tm)} подкидывает…${then}`
-      :`${who(tm)} решает, подкинуть ли…${then}`;
+    st.textContent=g.taking&&g.def===0?'Вы берёте. Соперники могут подкинуть ещё…'
+      :more?'Можно подкинуть ещё':then?then.trim():'';
     setActs([]);markPlayable();return;}
   if(pending){const c=pending;st.textContent='Перевести или побить?';
     setActs([['Перевести',()=>{pending=null;doTransfer(c);}],['Побить',()=>{pending=null;const i=g.table.findIndex((x,k)=>g.canDefend(0,c,k)),j=target>=0&&g.canDefend(0,c,target)?target:i;target=-1;myDo({t:'defend',c,i:j});}]]);return;}
@@ -1563,9 +1564,11 @@ function timeUp(){if(!g||g.over||g.toMove()!==0||NET)return;pending=null;
   gToast('Время вышло');afterAction();}
 function gToast(t){const el=$('toast');el.textContent=t;el.classList.remove('on');void el.offsetWidth;el.classList.add('on');}
 // a card shown for a moment over a player's seat (shown trump)
-function flashCard(c,p){const box=table.getBoundingClientRect();let x=W/2,y=handY-CH*1.2;
-  if(p>0){const s=$('seat'+p);if(s){const b=s.getBoundingClientRect();x=b.left-box.left+b.width/2;y=b.bottom-box.top+6;}}
-  const d=document.createElement('div');d.className='flash';d.style.cssText=`left:${x-CW/2}px;top:${y}px;width:${CW}px;height:${CH}px`;d.innerHTML=faceSVG(c);table.appendChild(d);setTimeout(()=>d.remove(),1500);}
+// a shown trump: big in the middle of the table for a moment, with who showed it
+function flashCard(c,p){const w=Math.round(CW*1.6),h=Math.round(CH*1.6);
+  const d=document.createElement('div');d.className='flash big';d.style.cssText=`left:${W/2-w/2}px;top:${H*.42-h/2}px;width:${w}px`;
+  d.innerHTML=`<div class="fc" style="height:${h}px">${faceSVG(c)}</div><div class="fl">${p===0?'Вы показали козырь':esc(who(p))+' показывает козырь'}</div>`;
+  table.appendChild(d);setTimeout(()=>d.remove(),2200);}
 
 
 /* ---------- cheating: Koschei sometimes lays a wrong card; "Поймал!" makes the cheater (or a wrong accuser) pick up the table ---------- */
@@ -1751,7 +1754,7 @@ function placeFinished(li,next){const L=LOCS[li],got=L.stages.reduce((a,s,si)=>a
   $('pdGo').textContent=N?'Отправиться':'К карте';
   $('pdGo').onclick=()=>{modal('placeDone',false);show('camp');if(N){const el=$('locs').children[next[0]];if(el){el.scrollIntoView({block:'center'});el.classList.add('fresh');setTimeout(()=>el.classList.remove('fresh'),2600);}}};
   chime(true);modal('placeDone',true);$('pdGo').focus();}
-window.__durak={applySkin,placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},get anim(){return anim;},get els(){return els;},showOver,startGame,get save(){return save;}};
+window.__durak={applySkin,placeFinished,get net(){return net;},backSVG,faceSVG,music,portrait,get g(){return g;},get busy(){return anim||botThinking;},get anim(){return anim;},get els(){return els;},flashCard,showOver,startGame,get save(){return save;}};
 // a game you walk away from after it has begun counts as a loss: otherwise "start again" would wipe every defeat.
 // Closing the page mid-game counts the same, the next time the game opens.
 function counts(){return !!g&&!g.over&&g.active(0)&&(g.bouts>0||g.table.length>0);}

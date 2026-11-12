@@ -219,6 +219,11 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
 #toast{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.9);z-index:400;background:rgba(20,12,6,.88);color:#ffe2a0;border:1.5px solid #c9952f;border-radius:14px;padding:10px 18px;font:700 15px var(--ui);opacity:0;pointer-events:none;text-align:center;max-width:80%}
 #toast.on{animation:toast 2.4s ease both}@keyframes toast{0%{opacity:0;transform:translate(-50%,-50%) scale(.9)}10%,80%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0}}
 .flash{position:absolute;z-index:350;border-radius:7px;overflow:hidden;box-shadow:0 0 0 3px #e6b450,0 10px 26px rgba(0,0,0,.5);animation:flashc 1.5s ease both;pointer-events:none}.flash svg{display:block;width:100%;height:100%}
+.flash.big{overflow:visible;box-shadow:none;border-radius:0;animation:flashb 2.2s ease both;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:450}
+.flash.big .fc{width:100%;border-radius:10px;overflow:hidden;box-shadow:0 0 0 4px #e6b450,0 0 44px rgba(255,215,110,.75)}.flash.big .fc svg{display:block;width:100%;height:100%}
+.flash.big .fl{font:700 15px var(--ui);color:#ffe2a0;background:rgba(0,0,0,.65);padding:6px 14px;border-radius:999px;white-space:nowrap}
+@media (max-width:480px){.seat:not(.col) .nm{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+@keyframes flashb{0%{opacity:0;transform:scale(.5)}12%,80%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.95)}}
 @keyframes flashc{0%{opacity:0;transform:scale(.6)}15%,75%{opacity:1;transform:scale(1.08)}100%{opacity:0;transform:scale(1)}}
 .card.chest .f::after{content:"";position:absolute;right:5%;bottom:4%;width:30%;height:22%;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 20'><rect x='1' y='7' width='22' height='12' rx='2' fill='%23a0652a' stroke='%23523011'/><path d='M1 9a11 6 0 0 1 22 0' fill='%23c58541' stroke='%23523011'/><rect x='10' y='8' width='4' height='5' rx='1' fill='%23f2c14e'/></svg>") center/contain no-repeat}
 :root{--band:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 22'><path d='M0 11 11 2l11 9 11-9 11 9-11 9-11-9-11 9z' fill='none' stroke='white' stroke-width='2'/><circle cx='11' cy='11' r='2.4' fill='white'/><circle cx='33' cy='11' r='2.4' fill='white'/></svg>")}
@@ -649,7 +654,7 @@ button.coins{pointer-events:auto;cursor:pointer;padding-right:5px}button.coins:h
   function log(){try{console.log('[pkb]',[].slice.call(arguments).join(' '));}catch(e){}}
   var started=false;
   function boot(pf){if(started)return;started=true;window.__PF=pf;
-    var s=document.createElement('script');s.src='game.js?v=1794447530';s.onload=function(){};document.body.appendChild(s);}
+    var s=document.createElement('script');s.src='game.js?v=1794449033';s.onload=function(){};document.body.appendChild(s);}
   // with no SDK (opened outside Pikabu, or it failed) the game still starts, just without the shop and ads
   var fallback=setTimeout(function(){log('sdk timeout');boot(null);},10000);
   // a purchase is shown to our server as Pikabu signed it; the server checks the signature and gives the goods

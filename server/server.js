@@ -56,7 +56,7 @@ G.limitBase=function(){return this.rules.noLimit?99:this.firstBout?5:6;};
 G.ranksOnTable=function(){const s=new Set();for(const p of this.table){s.add(p.a.r);if(p.d)s.add(p.d.r);}return s;};
 G.undefended=function(){return this.table.filter(p=>!p.d);};
 G.startBout=function(){
-  this.table=[];this.taking=false;this.passed=new Set();this.shown=new Set();
+  this.table=[];this.taking=false;this.passed=new Set();if(!this.shown)this.shown=new Set(); // a trump may be shown only once a game
   for(let p=0;p<this.n;p++)this.played[p]=[];
   this.limit=Math.min(this.limitBase(),this.hands[this.def].length);
   this.events.push({t:'bout',att:this.att,def:this.def});
@@ -84,7 +84,7 @@ G.canTransfer=function(p,c){
   const n=this.table.length+1;
   return n<=this.limitBase()&&this.hands[this.transferTarget()].length>=n;
 };
-// show a trump of the table's rank instead of laying a card: the attack moves on, the trump stays in hand
+// show a trump of the table's rank instead of laying a card: the attack moves on, the trump stays in hand (each trump once a game)
 G.canShow=function(p,c){
   if(this.over||this.mode!=='perevodnoy'||!this.rules.show||p!==this.def||this.taking||!this.has(p,c)||!this.isTrump(c)||this.shown.has(c.id))return false;
   if(!this.table.length||this.table.some(x=>x.d||x.a.r!==c.r))return false;
