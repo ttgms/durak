@@ -1101,6 +1101,8 @@ function lubokCourt(r,s,col,st){
     `<path d="M30 96c4-4 8-4 10 0M70 96c-4-4-8-4-10 0" stroke="#f5ead0" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;}
 function faceSVG(c,styleId){
   const st=FACE_STYLES[styleId||faceStyle]||FACE_STYLES.classic;
+  // a card not known yet (lies face down at an online table): a blank face, every style can draw it
+  if(c.ph||!st.col[c.s]||c.r==='?')return `<svg viewBox="0 0 100 140" aria-hidden="true"><rect x="1" y="1" width="98" height="138" rx="8" fill="${st.bg}" stroke="${st.edge}"/></svg>`;
   if(c.r==='J'){let j=jokerSVG(c);if(st.bg!=='#fbf7ee')j=j.replace('fill="#fbf7ee" stroke="#d9cfb8"',`fill="${st.dark?'#f3e7cc':st.bg}" stroke="${st.edge}"`);return j;}
   const col=st.col[c.s];
   const sh=(x,y,size,rot)=>suitShape(c.s,x,y,size,rot,col);
