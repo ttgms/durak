@@ -1644,7 +1644,7 @@ function afterAction(){
   if(fastFwd){masked=[];ghost=null;layout();return proceed();}
   anim=true;ghost=end.pairs;masked=evs.filter(e=>e.t==='draw').map(e=>e.c);layout();updateControls();
   const my=gen;
-  wait(end.t==='took'?700:800,()=>{if(my!==gen)return;
+  wait(end.t==='took'?900:1300,()=>{if(my!==gen)return; // long enough to see what was on the table
     ghost=null;layout();
     if(end.t==='took'){slap();if(end.p===0&&end.att>0)say(end.att,charLine(seatChar[end.att],'playerTook'),Math.random()<.5);}
     else{swish();if(end.att>0)say(end.att,charLine(seatChar[end.att],'bito'),Math.random()<.5);}

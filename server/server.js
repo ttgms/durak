@@ -634,7 +634,10 @@ function settleRec(){
   if(this.over||!this.table.length)return;
   if(!this.taking&&this.undefended().length>0)return;
   if(!this.taking&&this.hands[this.def].length===0)return this.endBout(false);
-  for(const q of this.throwers()){if(this.passed.has(q))continue;if(this.hands[q].some(c=>this.canAttack(q,c)))return;this.passed.add(q);this._ap.push(q);}
+  // at a table with people nobody is passed over for having nothing to add: that would tell the others what is not in the hand.
+  // Only when the table is full (public knowledge) the round ends by itself.
+  const full=this.table.length>=this.limit||(!this.taking&&this.undefended().length>=this.hands[this.def].length);
+  for(const q of this.throwers()){if(this.passed.has(q))continue;if(this._noAuto&&!full)return;if(this.hands[q].some(c=>this.canAttack(q,c)))return;this.passed.add(q);this._ap.push(q);}
   this.endBout(this.taking);}
 function card(g,p,id){return g.hands[p].find(c=>c.id===id)||null;}
 function applyMove(g,p,m){const c=m.c?card(g,p,m.c):null;
@@ -651,7 +654,7 @@ function applyMove(g,p,m){const c=m.c?card(g,p,m.c):null;
   return false;}
 // build the game; meta[i] tells what log entry i caused: its events and the automatic passes
 function build(room){
-  const g=new Game(gameOpts(room));g.settle=settleRec;g.events=[];const meta=[];
+  const g=new Game(gameOpts(room));g.settle=settleRec;g._noAuto=!room.solo;g.events=[];const meta=[];
   for(const e of room.log){g._ap=[];const e0=g.events.length;applyMove(g,e.p,e);meta.push({e0,e1:g.events.length,ap:g._ap});}
   g._ap=[];return {g,meta};}
 
